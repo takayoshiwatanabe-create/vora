@@ -39,6 +39,16 @@
       "pt": "./locales/pt.json",
       "ar": "./locales/ar.json",
       "hi": "./locales/hi.json"
+    },
+    "extra": {
+      "router": {
+        "origin": false
+      },
+      "eas": {
+        "projectId": "YOUR_EAS_PROJECT_ID"
+      },
+      "supabaseUrl": "YOUR_SUPABASE_URL",
+      "supabaseAnonKey": "YOUR_SUPABASE_ANON_KEY"
     }
   }
 }

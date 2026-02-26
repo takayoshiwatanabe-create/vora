@@ -217,6 +217,260 @@ Enterpriseカスタムモデル = カスタム
 ```
 ┌─────────────────────────────────────────────────────────────┐
 │                        CLIENTS
+│ (Web: Next.js 15, Mobile: Expo/React Native)
+│
+│ ┌───────────────────┐   ┌───────────────────┐
+│ │  Web Frontend     │   │  Mobile App       │
+│ │ (Next.js/React)   │   │ (Expo/RN)         │
+│ └───────────────────┘   └───────────────────┘
+│          │                      │
+│          └───────────┬──────────┘
+│                      │ HTTPS / WebSocket
+│                      ▼
+│ ┌─────────────────────────────────────────────────────────────┐
+│ │                     Vercel Edge Network                     │
+│ └─────────────────────────────────────────────────────────────┘
+│                      │ API Gateway (Next.js API Routes / Edge Functions)
+│                      ▼
+│ ┌─────────────────────────────────────────────────────────────┐
+│ │                     Backend Services                        │
+│ ├─────────────────────────────────────────────────────────────┤
+│ │ ┌───────────────┐   ┌───────────────┐   ┌───────────────┐ │
+│ │ │  Auth Service   │   │  Core API     │   │  AI Service   │ │
+│ │ │ (Supabase Auth) │   │ (Next.js API) │   │ (Edge Function) │ │
+│ │ └───────────────┘   └───────────────┘   └───────────────┘ │
+│ │        │                    │                    │          │
+│ │        ▼                    ▼                    ▼          │
+│ │ ┌─────────────────────────────────────────────────────────┐ │
+│ │ │                       Data Layer                        │ │
+│ │ ├─────────────────────────────────────────────────────────┤ │
+│ │ │ ┌───────────────┐ ┌───────────────┐ ┌───────────────┐ │ │
+│ │ │ │  PostgreSQL   │ │  Vector DB    │ │  Redis (Cache)│ │ │
+│ │ │ │ (Supabase DB) │ │  (Pinecone)   │ │  (Upstash)    │ │ │
+│ │ │ └───────────────┘ └───────────────┘ └───────────────┘ │ │
+│ │ └─────────────────────────────────────────────────────────┘ │
+│ └─────────────────────────────────────────────────────────────┘
+│
+│ ┌─────────────────────────────────────────────────────────────┐
+│ │                     External Integrations                   │
+│ ├─────────────────────────────────────────────────────────────┤
+│ │ ┌───────────────┐ ┌───────────────┐ ┌───────────────┐     │
+│ │ │  OpenAI API   │ │  Stripe       │ │  Localize     │     │
+│ │ │ (GPT-4o/Whisper)│ │ (Payments)    │ │ (i18n)        │     │
+│ │ └───────────────┘ └───────────────┘ └───────────────┘     │
+│ └─────────────────────────────────────────────────────────────┘
+```
+
+### 1.2 技術スタック詳細
+
+#### フロントエンド (Web)
+- **フレームワーク**: Next.js 15 (App Router)
+- **UIライブラリ**: React 19
+- **スタイリング**: Tailwind CSS v4, shadcn/ui
+- **状態管理**: Zustand
+- **データフェッチ**: TanStack Query v5
+- **国際化**: next-i18n (Localize連携)
+- **デプロイ**: Vercel
+
+#### フロントエンド (Mobile)
+- **フレームワーク**: Expo (React Native)
+- **UIライブラリ**: React Native
+- **スタイリング**: StyleSheet (Tailwind CSS for React Native via NativeWind is an option for future, but start with StyleSheet)
+- **状態管理**: Zustand
+- **データフェッチ**: TanStack Query v5
+- **国際化**: `expo-localization` + カスタムi18nモジュール
+- **デプロイ**: Expo EAS
+
+#### バックエンド
+- **プラットフォーム**: Next.js API Routes / Edge Functions (Vercel)
+- **認証**: Supabase Auth (OAuth2, Magic Link, Email/Password)
+- **データベース**: PostgreSQL 16 (Supabase)
+- **ORM**: Drizzle ORM
+- **リアルタイム**: Supabase Realtime
+- **AI**: OpenAI API (GPT-4o for processing, Whisper v3 for speech-to-text)
+- **Vector DB**: Pinecone
+- **キャッシュ/レート制限**: Upstash Redis
+- **決済**: Stripe (Billing, Usage-based metering)
+
+---
+
+## 第2章 主要機能設計
+
+### 2.1 認証フロー (Supabase Auth)
+
+#### 2.1.1 認証方式
+- **必須**: メールアドレス/パスワード認証
+- **必須**: マジックリンク認証
+- **必須**: OAuth2 (Google, Apple)
+
+#### 2.1.2 フロー詳細
+1. **サインアップ**:
+    - ユーザーはメールアドレスとパスワードを入力。
+    - Supabase Authでユーザーを作成。
+    - 成功後、メール確認リンクを送信（設定による）。
+    - ユーザーはサインインページへリダイレクト。
+2. **サインイン (メール/パスワード)**:
+    - ユーザーはメールアドレスとパスワードを入力。
+    - Supabase Authで認証。
+    - 成功後、ホームダッシュボードへリダイレクト。
+3. **サインイン (マジックリンク)**:
+    - ユーザーはメールアドレスを入力。
+    - Supabase Authがマジックリンクをメールで送信。
+    - ユーザーはメール内のリンクをクリックし、アプリへリダイレクトされ認証完了。
+4. **サインイン (OAuth2)**:
+    - ユーザーはGoogleまたはAppleボタンをクリック。
+    - Supabase AuthがOAuthプロバイダーへリダイレクト。
+    - 認証成功後、アプリへリダイレクトされ認証完了。
+
+#### 2.1.3 セキュリティ
+- すべての認証エンドポイントはHTTPS経由。
+- JWTトークンはSupabaseによって管理され、セキュアな方法でクライアントに保存。
+- RLS (Row Level Security) をSupabaseで設定し、ユーザーデータへのアクセスを制限。
+
+### 2.2 音声入力とカード生成
+
+#### 2.2.1 フロー概要
+1. **音声録音**:
+    - ユーザーはアプリ内でマイクボタンをタップし、音声を録音。
+    - 録音はリアルタイムでクライアント側で処理されるか、短いチャンクに分割される。
+2. **音声→テキスト変換 (Whisper)**:
+    - 録音された音声データは、クライアントから直接Vercel Edge Functionへ送信。
+    - Edge Functionは、OpenAI Whisper APIを呼び出し、音声をテキストに変換。
+    - **重要**: 音声データはEdge Functionで処理後、即座に破棄され、永続的に保存されない（Privacy by Design）。
+3. **テキスト→カード生成 (GPT-4o)**:
+    - Whisperから返されたテキストは、別のEdge FunctionまたはCore APIへ送信。
+    - このAPIはOpenAI GPT-4oを呼び出し、テキストからカンバンカードのタイトル、説明、カテゴリ、優先度などを抽出・生成。
+    - AIが自信を持てない場合（例: 複数の解釈が可能）、ユーザーに確認を促すUIを表示。
+4. **カード保存**:
+    - 生成されたカードデータは、Drizzle ORMを介してSupabase PostgreSQLデータベースに保存。
+    - リアルタイムでUIに反映されるよう、Supabase Realtimeを使用。
+
+#### 2.2.2 エラーハンドリング
+- 音声認識失敗時: ユーザーに再試行を促すメッセージを表示。
+- カード生成失敗時: エラーメッセージを表示し、手動入力オプションを提供。
+
+### 2.3 カンバンボード表示
+
+#### 2.3.1 UI要素
+- **ボード**: 複数のリスト（例: ToDo, Doing, Done）を含む。
+- **リスト**: 関連するカードのグループ。ドラッグ＆ドロップで並べ替え可能。
+- **カード**: タスクを表す最小単位。タイトル、説明、担当者、期限、タグなどを含む。
+- **フィルター/ソート**: 担当者、期限、タグ、優先度などでカードをフィルタリング・ソート。
+
+#### 2.3.2 リアルタイム同期
+- Supabase Realtime (WebSocket) を使用し、複数のデバイスやユーザー間でのボードの変更をリアルタイムで同期。
+- オフライン時はIndexedDBなどに一時保存し、オンライン復帰後に同期（Local First Sync）。
+
+### 2.4 振り返り機能 (AI生成)
+
+#### 2.4.1 フロー概要
+1. **期間選択**:
+    - ユーザーは振り返りの対象期間（例: 過去1週間、今月）を選択。
+2. **AI分析**:
+    - 選択された期間のカードデータがCore APIに送信される。
+    - Core APIはGPT-4oを呼び出し、以下の分析を行う:
+        - 完了したタスクの要約と成果
+        - 未完了タスクの傾向と課題
+        - 優先度付けの評価
+        - 次のアクション提案
+3. **レポート表示**:
+    - AIが生成した振り返りレポートをユーザーに表示。
+    - レポートは編集可能で、ユーザーはコメントを追加できる。
+4. **クレジット消費**:
+    - 振り返りレポート生成ごとにAIクレジットを消費。
+
+---
+
+## 第3章 データモデル (Drizzle ORM)
+
+### 3.1 `users` テーブル (Supabase Auth連携)
+- `id` (UUID, PK, auth.uid()から自動挿入)
+- `email` (TEXT, UNIQUE)
+- `display_name` (TEXT, NULLABLE)
+- `avatar_url` (TEXT, NULLABLE)
+- `created_at` (TIMESTAMPZ, DEFAULT NOW())
+- `updated_at` (TIMESTAMPZ, DEFAULT NOW())
+
+### 3.2 `workspaces` テーブル
+- `id` (UUID, PK, DEFAULT gen_random_uuid())
+- `name` (TEXT, NOT NULL)
+- `owner_id` (UUID, FK to `users.id`, NOT NULL)
+- `created_at` (TIMESTAMPZ, DEFAULT NOW())
+- `updated_at` (TIMESTAMPZ, DEFAULT NOW())
+- RLS: `auth.uid() = owner_id` または `id` が `user_workspace` に存在
+
+### 3.3 `user_workspaces` テーブル (多対多結合)
+- `user_id` (UUID, FK to `users.id`, PK)
+- `workspace_id` (UUID, FK to `workspaces.id`, PK)
+- `role` (TEXT, ENUM: 'owner', 'admin', 'member', DEFAULT 'member')
+- `created_at` (TIMESTAMPZ, DEFAULT NOW())
+- RLS: `auth.uid() = user_id`
+
+### 3.4 `boards` テーブル
+- `id` (UUID, PK, DEFAULT gen_random_uuid())
+- `workspace_id` (UUID, FK to `workspaces.id`, NOT NULL)
+- `name` (TEXT, NOT NULL)
+- `description` (TEXT, NULLABLE)
+- `created_at` (TIMESTAMPZ, DEFAULT NOW())
+- `updated_at` (TIMESTAMPZ, DEFAULT NOW())
+- RLS: `workspace_id` が `user_workspaces` に存在
+
+### 3.5 `lists` テーブル (カンバンリスト)
+- `id` (UUID, PK, DEFAULT gen_random_uuid())
+- `board_id` (UUID, FK to `boards.id`, NOT NULL)
+- `name` (TEXT, NOT NULL)
+- `order` (INT, NOT NULL) -- リストの表示順
+- `created_at` (TIMESTAMPZ, DEFAULT NOW())
+- `updated_at` (TIMESTAMPZ, DEFAULT NOW())
+- RLS: `board_id` が `boards` に存在
+
+### 3.6 `kanban_cards` テーブル
+- `id` (UUID, PK, DEFAULT gen_random_uuid())
+- `list_id` (UUID, FK to `lists.id`, NOT NULL)
+- `title` (TEXT, NOT NULL)
+- `description` (TEXT, NULLABLE)
+- `priority` (TEXT, ENUM: 'low', 'medium', 'high', NULLABLE)
+- `due_date` (DATE, NULLABLE)
+- `assigned_to` (UUID, FK to `users.id`, NULLABLE)
+- `tags` (TEXT[], NULLABLE)
+- `order` (INT, NOT NULL) -- カードの表示順
+- `created_at` (TIMESTAMPZ, DEFAULT NOW())
+- `updated_at` (TIMESTAMPZ, DEFAULT NOW())
+- RLS: `list_id` が `lists` に存在
+
+### 3.7 `audit_logs` テーブル (AI処理記録)
+- `id` (UUID, PK, DEFAULT gen_random_uuid())
+- `user_id` (UUID, FK to `users.id`, NOT NULL)
+- `event_type` (TEXT, ENUM: 'speech_to_text', 'card_generation', 'retrospection_report')
+- `input_data` (JSONB, NULLABLE) -- 処理されたテキストなど（機密情報を含まない）
+- `output_data` (JSONB, NULLABLE) -- AIの出力結果の要約（機密情報を含まない）
+- `cost_credits` (INT, NOT NULL, DEFAULT 0)
+- `created_at` (TIMESTAMPZ, DEFAULT NOW())
+- RLS: `auth.uid() = user_id`
+
+---
+
+## 第4章 国際化 (i18n)
+
+### 4.1 対応言語
+- `ja` (日本語 - ベース言語)
+- `en` (英語)
+- `zh` (中国語 - 簡体字)
+- `ko` (韓国語)
+- `es` (スペイン語)
+- `fr` (フランス語)
+- `de` (ドイツ語)
+- `pt` (ポルトガル語 - ブラジル)
+- `ar` (アラビア語 - RTLサポート必須)
+- `hi` (ヒンディー語)
+
+### 4.2 実装詳細
+- **Web**: `next-i18n` と Localize 連携。
+- **Mobile**: `expo-localization` を使用してデバイスの言語を検出し、カスタムi18nモジュール (`@/i18n`) で翻訳を管理。
+- すべてのユーザー向け文字列は翻訳キーを使用し、ハードコードは禁止。
+- RTL (Right-to-Left) 言語 (アラビア語 `ar`) の場合、UIの方向を自動的に調整。
+
+---
 
 ## Development Instructions
 N/A
@@ -241,3 +495,5 @@ N/A
 - Default language: ja (Japanese)
 - RTL support required for Arabic (ar)
 - Use isRTL flag from i18n module for layout adjustments
+
+

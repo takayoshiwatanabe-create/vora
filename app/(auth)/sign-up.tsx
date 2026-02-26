@@ -11,28 +11,38 @@ import {
 import { Link, useRouter } from "expo-router";
 import { t, isRTL } from "@/i18n";
 import { supabase } from "@/lib/supabase";
+import { useAuthStore } from "@/stores/authStore"; // Import Zustand store
 
 export default function SignUpScreen() {
   const [email, setEmail] = useState<string>("");
   const [password, setPassword] = useState<string>("");
   const [loading, setLoading] = useState<boolean>(false);
   const router = useRouter();
+  const setSession = useAuthStore((state) => state.setSession); // Get setSession from Zustand
 
   const handleSignUp = async () => {
     setLoading(true);
-    const { error } = await supabase.auth.signUp({
+    const { data, error } = await supabase.auth.signUp({
       email,
       password,
     });
 
     if (error) {
       Alert.alert(t("auth.signUpErrorTitle"), error.message);
-    } else {
+    } else if (data.session) {
+      setSession(data.session); // Update Zustand store
       Alert.alert(
         t("auth.signUpSuccessTitle"),
         t("auth.signUpSuccessMessage")
       );
-      router.replace("/(auth)/sign-in"); // Redirect to sign-in after successful sign-up
+      router.replace("/"); // Redirect to home after successful sign-up and session set
+    } else if (data.user && !data.session) {
+      // User created but no session (e.g., email confirmation required)
+      Alert.alert(
+        t("auth.signUpSuccessTitle"),
+        t("auth.signUpConfirmationMessage") // New translation key for confirmation
+      );
+      router.replace("/(auth)/sign-in"); // Redirect to sign-in to await confirmation
     }
     setLoading(false);
   };
@@ -138,3 +148,4 @@ const styles = StyleSheet.create({
     fontSize: 16,
   },
 });
+

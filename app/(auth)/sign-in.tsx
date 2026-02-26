@@ -11,23 +11,26 @@ import {
 import { Link, useRouter } from "expo-router";
 import { t, isRTL } from "@/i18n";
 import { supabase } from "@/lib/supabase";
+import { useAuthStore } from "@/stores/authStore"; // Import Zustand store
 
 export default function SignInScreen() {
   const [email, setEmail] = useState<string>("");
   const [password, setPassword] = useState<string>("");
   const [loading, setLoading] = useState<boolean>(false);
   const router = useRouter();
+  const setSession = useAuthStore((state) => state.setSession); // Get setSession from Zustand
 
   const handleSignIn = async () => {
     setLoading(true);
-    const { error } = await supabase.auth.signInWithPassword({
+    const { data, error } = await supabase.auth.signInWithPassword({
       email,
       password,
     });
 
     if (error) {
       Alert.alert(t("auth.signInErrorTitle"), error.message);
-    } else {
+    } else if (data.session) {
+      setSession(data.session); // Update Zustand store
       router.replace("/"); // Navigate to home on successful sign-in
     }
     setLoading(false);
@@ -213,3 +216,4 @@ const styles = StyleSheet.create({
     fontSize: 16,
   },
 });
+

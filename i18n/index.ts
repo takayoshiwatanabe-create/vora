@@ -1,6 +1,6 @@
 import * as Localization from "expo-localization";
 import { translations, type Language } from "./translations";
-import { I18nManager } from "react-native"; // Re-added I18nManager import
+import { I18nManager } from "react-native";
 
 const SUPPORTED_LANGUAGES: Language[] = ["ja", "en", "zh", "ko", "es", "fr", "de", "pt", "ar", "hi"];
 
@@ -25,13 +25,11 @@ export const isRTL = ["ar"].includes(lang);
 
 // Set I18nManager.forceRTL and I18nManager.allowRTL immediately on module load
 // This ensures it's set before any components render, which is crucial for native.
+// The actual reload logic should be handled in _layout.tsx for better control.
 if (I18nManager.isRTL !== isRTL) {
   I18nManager.forceRTL(isRTL);
   I18nManager.allowRTL(isRTL);
-  // Forcing a reload is often necessary for full RTL changes to take effect on native.
-  // This should ideally be handled at the app's entry point or a splash screen
-  // to prevent UI glitches. For now, we set it here.
-  // In a real app, you might want to prompt the user to restart or handle this more gracefully.
+  // Do NOT force reload here. Let _layout.tsx handle it if necessary.
 }
 
 export function t(key: string, vars?: Record<string, string | number>): string {
@@ -44,3 +42,4 @@ export function t(key: string, vars?: Record<string, string | number>): string {
   }
   return text;
 }
+

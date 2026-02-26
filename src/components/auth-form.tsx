@@ -5,3 +5,4 @@
 // If a shared component for input fields or buttons were needed, it would be placed
 // in a `src/components/ui` or similar directory.
 // The file is kept to explicitly state its non-necessity, aligning with the "Liquid Minimal" principle.
+

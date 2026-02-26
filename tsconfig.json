@@ -33,7 +33,7 @@
         "src/types/*"
       ],
       "@/i18n": [
-        "src/i18n.ts"
+        "src/i18n/index.ts"
       ]
     }
   },
@@ -46,3 +46,4 @@
     "src/**/*.tsx"
   ]
 }
+

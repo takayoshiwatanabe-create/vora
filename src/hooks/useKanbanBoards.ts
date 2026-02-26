@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback } from "react";
 import { supabase } from "@/lib/supabase";
 import { useAuthStore } from "@/stores/authStore";
-import { KanbanBoard } from "@/types/kanban"; // Use the type from src/types
+import { KanbanBoard } from "@/src/types/kanban"; // Use the type from src/types
 import { PostgrestError } from "@supabase/supabase-js"; // Import PostgrestError
 
 interface UseKanbanBoardsResult {
@@ -53,3 +53,5 @@ export function useKanbanBoards(): UseKanbanBoardsResult {
 
   return { boards, loading, error, refetch: fetchBoards }; // Ensure boards is always an array
 }
+
+

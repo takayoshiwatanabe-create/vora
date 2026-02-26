@@ -36,3 +36,4 @@ export const t = (key: string, options?: Record<string, unknown>): string => {
 };
 
 export { isRTL };
+

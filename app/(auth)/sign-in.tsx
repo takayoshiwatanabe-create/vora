@@ -244,4 +244,3 @@ const styles = StyleSheet.create({
   },
 });
 
-

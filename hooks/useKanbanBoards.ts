@@ -40,7 +40,18 @@ export function useKanbanBoards(): UseKanbanBoardsResult {
       setBoards(data || []);
     } catch (err: unknown) {
       // Ensure error is of type PostgrestError or convert to a generic Error
-      setError(err && typeof err === 'object' && 'message' in err && 'code' in err ? err as PostgrestError : { message: String(err), code: 'UNKNOWN_ERROR', details: '', hint: '' });
+      // PostgrestError has 'message', 'code', 'details', 'hint'
+      if (err && typeof err === 'object' && 'message' in err) {
+        const postgrestError: PostgrestError = {
+          message: (err as { message: string }).message,
+          code: (err as { code?: string }).code || 'UNKNOWN_ERROR',
+          details: (err as { details?: string }).details || '',
+          hint: (err as { hint?: string }).hint || '',
+        };
+        setError(postgrestError);
+      } else {
+        setError({ message: String(err), code: 'UNKNOWN_ERROR', details: '', hint: '' });
+      }
       setBoards([]);
     } finally {
       setLoading(false);
@@ -53,3 +64,4 @@ export function useKanbanBoards(): UseKanbanBoardsResult {
 
   return { boards, loading, error, refetch: fetchBoards }; // Ensure boards is always an array
 }
+

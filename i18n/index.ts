@@ -5,12 +5,12 @@ import { translations } from "./translations";
 
 // Set the locale once at the beginning of your app.
 export const lang = Localization.getLocales()[0]?.languageCode || "ja"; // Default to Japanese
-const isRTL = Localization.getLocales()[0]?.textDirection === "rtl";
+export const isRTL = Localization.getLocales()[0]?.textDirection === "rtl";
 
 // Set I18nManager.forceRTL and I18nManager.allowRTL immediately on module load
 // This ensures it's set before any components render, which is crucial for native.
 // The actual reload logic should be handled in _layout.tsx for better control.
-if (I18nManager.isRTL !== isRTL && lang === "ar") { // Only force RTL if language is Arabic
+if (I18nManager.isRTL !== isRTL) {
   I18nManager.forceRTL(isRTL);
   I18nManager.allowRTL(isRTL);
   // Do NOT force reload here. Let _layout.tsx handle it if necessary.
@@ -35,4 +35,7 @@ export const t = (key: string, options?: Record<string, unknown>): string => {
   return i18n.t(key, options);
 };
 
-export { isRTL };
+// Export isRTL here as well, as it's defined in this module.
+// This makes it consistently available from @/i18n
+// export { isRTL }; // This line is redundant as it's already exported above.
+

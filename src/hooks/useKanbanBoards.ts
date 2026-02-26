@@ -54,4 +54,3 @@ export function useKanbanBoards(): UseKanbanBoardsResult {
   return { boards, loading, error, refetch: fetchBoards }; // Ensure boards is always an array
 }
 
-

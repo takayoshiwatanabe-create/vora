@@ -26,4 +26,3 @@ export function useAuth(setSessionStore: (session: Session | null) => void): voi
   }, [setSessionStore]);
 }
 
-

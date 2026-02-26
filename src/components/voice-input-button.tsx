@@ -1,21 +1,18 @@
 import React, { useState, useEffect } from "react";
 import {
-  TouchableOpacity,
+  View,
   Text,
+  TouchableOpacity,
   StyleSheet,
   Alert,
   ActivityIndicator,
-  View,
+  Platform,
 } from "react-native";
 import { Audio } from "expo-av";
 import * as FileSystem from "expo-file-system";
 import { t, isRTL } from "@/i18n";
 import { supabase } from "@/lib/supabase";
 import { useAuthStore } from "@/stores/authStore";
-import { processAudioWithAI } from "@/api/ai"; // Import the AI processing function
-import { createKanbanCard } from "@/api/kanban"; // Import the Kanban card creation function
-import { KanbanCardSuggestion } from "@/types/kanban";
-import { AiSuggestionModal } from "./ai-suggestion-modal"; // Import the AI suggestion modal
 
 interface VoiceInputButtonProps {
   boardId?: string; // Optional boardId for creating cards in a specific board
@@ -31,41 +28,32 @@ export function VoiceInputButton({
   );
   const [isRecording, setIsRecording] = useState<boolean>(false);
   const [isProcessing, setIsProcessing] = useState<boolean>(false);
-  const [showSuggestionModal, setShowSuggestionModal] = useState<boolean>(false);
-  const [aiSuggestion, setAiSuggestion] = useState<KanbanCardSuggestion | null>(null);
-  const [aiError, setAiError] = useState<string | null>(null);
-
   const session = useAuthStore((state) => state.session);
-  const userId = session?.user?.id;
 
   useEffect(() => {
-    // Request microphone permissions on component mount
-    void requestMicrophonePermission();
+    // Request microphone permission on component mount
+    void Audio.requestPermissionsAsync();
   }, []);
 
-  const requestMicrophonePermission = async (): Promise<void> => {
-    const { status } = await Audio.requestPermissionsAsync();
-    if (status !== "granted") {
-      Alert.alert(
-        t("voiceInput.permissionDeniedTitle"),
-        t("voiceInput.permissionDeniedMessage")
-      );
-    }
-  };
-
   const startRecording = async (): Promise<void> => {
+    if (!session) {
+      Alert.alert(t("common.error"), t("auth.notAuthenticated"));
+      return;
+    }
+
     try {
-      if (!session) {
-        Alert.alert(t("common.error"), t("auth.notAuthenticated"));
+      const permission = await Audio.requestPermissionsAsync();
+      if (permission.status !== "granted") {
+        Alert.alert(
+          t("voiceInput.permissionDeniedTitle"),
+          t("voiceInput.permissionDeniedMessage")
+        );
         return;
       }
 
       await Audio.setAudioModeAsync({
         allowsRecordingIOS: true,
         playsInSilentModeIOS: true,
-        staysActiveInBackground: false,
-        shouldDuckAndroid: true,
-        playThroughEarpieceAndroid: false,
       });
 
       const { recording } = await Audio.Recording.createAsync(
@@ -73,11 +61,12 @@ export function VoiceInputButton({
       );
       setRecording(recording);
       setIsRecording(true);
-      setAiError(null); // Clear previous errors
-      setAiSuggestion(null); // Clear previous suggestion
     } catch (err: unknown) {
       console.error("Failed to start recording", err);
-      Alert.alert(t("voiceInput.errorTitle"), t("voiceInput.startRecordingError"));
+      Alert.alert(
+        t("voiceInput.errorTitle"),
+        t("voiceInput.startRecordingError")
+      );
       setIsRecording(false);
     }
   };
@@ -85,193 +74,166 @@ export function VoiceInputButton({
   const stopRecording = async (): Promise<void> => {
     setIsRecording(false);
     setIsProcessing(true);
+
+    if (!recording) {
+      Alert.alert(
+        t("voiceInput.errorTitle"),
+        t("voiceInput.stopRecordingError")
+      );
+      setIsProcessing(false);
+      return;
+    }
+
     try {
-      if (!recording) {
-        throw new Error("Recording object is undefined.");
-      }
-
       await recording.stopAndUnloadAsync();
-      await Audio.setAudioModeAsync({
-        allowsRecordingIOS: false,
-        playsInSilentModeIOS: true,
-        staysActiveInBackground: false,
-        shouldDuckAndroid: true,
-        playThroughEarpieceAndroid: false,
-      });
-
       const uri = recording.getURI();
       setRecording(undefined);
 
-      if (uri) {
-        const audioBlob = await (await fetch(uri)).blob();
-        await processAudio(audioBlob);
-      } else {
-        throw new Error("Recording URI is null.");
+      if (!uri) {
+        Alert.alert(
+          t("voiceInput.errorTitle"),
+          t("voiceInput.noTextFound")
+        );
+        setIsProcessing(false);
+        return;
       }
+
+      await processAudio(uri);
     } catch (err: unknown) {
       console.error("Failed to stop recording", err);
-      Alert.alert(t("voiceInput.errorTitle"), t("voiceInput.stopRecordingError"));
-      setAiError((err as Error).message || t("voiceInput.stopRecordingError"));
-      setShowSuggestionModal(true); // Show modal with error
-    } finally {
-      setIsProcessing(false);
-      // Clean up the temporary audio file
-      // The URI is no longer needed after converting to blob and processing.
-      // FileSystem.deleteAsync(uri) should be handled by useVoiceRecording hook if used,
-      // but here we are directly managing recording, so we need to clean up.
-      // However, fetch(uri).blob() might not create a local file that needs explicit deletion.
-      // If it does, we need to ensure it's cleaned up. For now, assuming it's in-memory.
-    }
-  };
-
-  const processAudio = async (audioBlob: Blob): Promise<void> => {
-    if (!session || !userId) {
-      Alert.alert(t("common.error"), t("auth.notAuthenticated"));
-      setIsProcessing(false);
-      return;
-    }
-
-    try {
-      const { suggestion, confidence, message } = await processAudioWithAI(audioBlob, boardId);
-
-      if (suggestion && confidence >= 0.7) { // AI Confidence First: Only auto-suggest if confidence is high
-        setAiSuggestion(suggestion);
-        setShowSuggestionModal(true);
-      } else if (suggestion && confidence < 0.7) { // Low confidence, show suggestion for user to confirm/edit
-        setAiSuggestion(suggestion);
-        setShowSuggestionModal(true);
-        Alert.alert(t("aiSuggestion.lowConfidenceTitle"), t("aiSuggestion.lowConfidenceMessage"));
-      } else { // No suggestion or very low confidence
-        setAiError(message || t("api.ai.noCardReturned"));
-        setShowSuggestionModal(true);
-      }
-    } catch (err: unknown) {
-      console.error("Error processing audio:", err);
-      setAiError((err as Error).message || t("voiceInput.processingError"));
-      setShowSuggestionModal(true);
-    } finally {
-      setIsProcessing(false);
-    }
-  };
-
-  const handleConfirmSuggestion = async (confirmedSuggestion: KanbanCardSuggestion): Promise<void> => {
-    if (!userId || !boardId) {
-      Alert.alert(t("common.error"), t("kanban.boardNotSelected")); // New translation key needed
-      return;
-    }
-
-    setIsProcessing(true); // Show processing indicator while creating card
-    setShowSuggestionModal(false); // Hide modal immediately
-
-    try {
-      const { data, error } = await createKanbanCard(confirmedSuggestion, boardId, userId);
-      if (error) {
-        throw error;
-      }
-      if (data) {
-        Alert.alert(
-          t("voiceInput.successTitle"),
-          t("voiceInput.successMessage", { text: data.title })
-        );
-        onCardCreated?.(data.title);
-      }
-    } catch (err: unknown) {
-      console.error("Error creating Kanban card:", err);
       Alert.alert(
         t("voiceInput.errorTitle"),
-        (err as Error).message || t("kanban.createCardError") // New translation key needed
+        t("voiceInput.stopRecordingError")
       );
     } finally {
       setIsProcessing(false);
-      setAiSuggestion(null); // Clear suggestion after processing
-      setAiError(null); // Clear error after processing
     }
   };
 
-  const handleCancelSuggestion = (): void => {
-    setShowSuggestionModal(false);
-    setAiSuggestion(null);
-    setAiError(null);
-  };
+  const processAudio = async (audioUri: string): Promise<void> => {
+    if (!session) {
+      Alert.alert(t("common.error"), t("auth.notAuthenticated"));
+      return;
+    }
 
-  const handleEditSuggestion = (field: keyof KanbanCardSuggestion, value: string): void => {
-    if (aiSuggestion) {
-      setAiSuggestion((prev) => ({
-        ...(prev as KanbanCardSuggestion),
-        [field]: value,
-      }));
+    try {
+      const fileInfo = await FileSystem.getInfoAsync(audioUri);
+      if (!fileInfo.exists) {
+        throw new Error("Audio file does not exist.");
+      }
+
+      const fileContent = await FileSystem.readAsStringAsync(audioUri, {
+        encoding: FileSystem.EncodingType.Base64,
+      });
+
+      // Call Supabase Edge Function for AI processing
+      const { data, error } = await supabase.functions.invoke("process-voice", {
+        body: {
+          audioBase64: fileContent,
+          boardId: boardId,
+          userId: session.user.id,
+        },
+      });
+
+      if (error) {
+        console.error("Edge Function error:", error);
+        Alert.alert(
+          t("voiceInput.errorTitle"),
+          t("api.ai.edgeFunctionError")
+        );
+        return;
+      }
+
+      const cardText = data?.cardText;
+      if (cardText) {
+        Alert.alert(
+          t("voiceInput.successTitle"),
+          t("voiceInput.successMessage", { text: cardText })
+        );
+        onCardCreated?.(cardText);
+      } else {
+        Alert.alert(
+          t("voiceInput.errorTitle"),
+          t("api.ai.noCardReturned")
+        );
+      }
+    } catch (err: unknown) {
+      console.error("Audio processing error:", err);
+      Alert.alert(
+        t("voiceInput.errorTitle"),
+        t("voiceInput.processingError")
+      );
+    } finally {
+      // Clean up the temporary audio file
+      void FileSystem.deleteAsync(audioUri, { idempotent: true });
     }
   };
-
-  const buttonText = isRecording
-    ? t("voiceInput.stopRecording")
-    : isProcessing
-    ? t("voiceInput.processingAudio")
-    : t("voiceInput.startRecording");
 
   return (
-    <View>
+    <View style={[styles.container, isRTL && styles.rtlContainer]}>
       <TouchableOpacity
         style={[
           styles.button,
-          isRecording && styles.recordingButton,
-          isProcessing && styles.processingButton,
-          isRTL && styles.rtlButton,
+          isRecording ? styles.buttonRecording : styles.buttonIdle,
         ]}
-        onPress={isRecording ? () => void stopRecording() : () => void startRecording()}
+        onPress={isRecording ? void stopRecording : void startRecording}
         disabled={isProcessing}
       >
         {isProcessing ? (
           <ActivityIndicator color="#fff" />
         ) : (
-          <Text style={[styles.buttonText, isRTL && styles.rtlText]}>
-            {buttonText}
+          <Text style={styles.buttonText}>
+            {isRecording
+              ? t("voiceInput.stopRecording")
+              : t("voiceInput.startRecording")}
           </Text>
         )}
       </TouchableOpacity>
-
-      <AiSuggestionModal
-        isVisible={showSuggestionModal}
-        suggestion={aiSuggestion}
-        loading={isProcessing} // Modal should show loading if processing, even if suggestion is null
-        error={aiError}
-        onConfirm={handleConfirmSuggestion}
-        onCancel={handleCancelSuggestion}
-        onEdit={handleEditSuggestion}
-      />
+      {isProcessing && (
+        <Text style={[styles.processingText, isRTL && styles.rtlText]}>
+          {t("voiceInput.processingAudio")}
+        </Text>
+      )}
     </View>
   );
 }
 
 const styles = StyleSheet.create({
-  button: {
-    backgroundColor: "#007bff",
-    paddingVertical: 15,
-    paddingHorizontal: 30,
-    borderRadius: 30,
+  container: {
     alignItems: "center",
+    marginTop: 20,
+    marginBottom: 20,
+  },
+  rtlContainer: {
+    // Specific RTL layout adjustments if needed
+  },
+  button: {
+    width: 150,
+    height: 150,
+    borderRadius: 75,
     justifyContent: "center",
-    marginVertical: 20,
-    minWidth: 200,
+    alignItems: "center",
     shadowColor: "#000",
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.25,
     shadowRadius: 3.84,
     elevation: 5,
   },
-  recordingButton: {
-    backgroundColor: "#dc3545", // Red for recording
+  buttonIdle: {
+    backgroundColor: "#007bff",
   },
-  processingButton: {
-    backgroundColor: "#ffc107", // Yellow for processing
+  buttonRecording: {
+    backgroundColor: "#dc3545",
   },
   buttonText: {
     color: "#fff",
     fontSize: 18,
     fontWeight: "bold",
   },
-  rtlButton: {
-    // Adjustments for RTL if necessary
+  processingText: {
+    marginTop: 10,
+    fontSize: 16,
+    color: "#666",
   },
   rtlText: {
     textAlign: "right",

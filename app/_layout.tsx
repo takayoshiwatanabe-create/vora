@@ -7,6 +7,7 @@ import { useEffect, useState } from "react";
 import { useAuthStore } from "@/stores/authStore";
 import { useAuth } from "@/src/hooks/useAuth";
 import { useFonts } from "expo-font";
+import * as Updates from 'expo-updates'; // Import Updates
 
 // Prevent the splash screen from auto-hiding before asset loading is complete.
 SplashScreen.preventAutoHideAsync();
@@ -29,14 +30,22 @@ export default function RootLayout(): JSX.Element {
     async function prepare(): Promise<void> {
       try {
         // Set RTL direction for the entire app
-        if (I18nManager.isRTL !== isRTL && lang === "ar") { // Only force RTL if language is Arabic
+        // The i18n/index.ts module already sets I18nManager.forceRTL and I18nManager.allowRTL
+        // based on the detected locale's text direction.
+        // If the app is already configured for RTL and the current locale is RTL,
+        // or if it's LTR and the current locale is LTR, no change is needed.
+        // If there's a mismatch, it means the app needs to reload to apply the new direction.
+        if (I18nManager.isRTL !== isRTL) {
           I18nManager.forceRTL(isRTL);
           I18nManager.allowRTL(isRTL);
-          // On native, a reload is often required for the full effect.
-          // Forcing a reload here might be too aggressive for a simple useEffect.
-          // A more robust solution for production might involve a splash screen
-          // and then reloading the app if the RTL setting changes.
-          // For now, we'll rely on the initial setting and user restarting if needed.
+          // On native, a full reload is often required for the full effect.
+          if (Updates.isEmbedded) {
+            await Updates.reloadAsync();
+          } else {
+            // In development, `Updates.reloadAsync` might not work as expected.
+            // Advise user to restart manually.
+            console.warn("Updates.reloadAsync is not available in development. Please restart your app manually for RTL changes to take effect.");
+          }
         }
       } catch (e) {
         console.warn(e);
@@ -49,7 +58,7 @@ export default function RootLayout(): JSX.Element {
     if (fontsLoaded) {
       void prepare(); // Use void to ignore the Promise
     }
-  }, [fontsLoaded, isRTL, lang]); // Add isRTL and lang to dependencies
+  }, [fontsLoaded, isRTL]); // Add isRTL to dependencies, lang is implicitly handled by isRTL
 
   useEffect(() => {
     if (isReady) {

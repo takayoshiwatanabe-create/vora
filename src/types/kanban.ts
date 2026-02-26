@@ -5,7 +5,7 @@ export interface KanbanBoard {
   name: string;
   description: string | null;
   created_at: string;
-  card_count: number; // Add card_count to the interface
+  card_count: number;
 }
 
 export interface KanbanCard {
@@ -18,7 +18,6 @@ export interface KanbanCard {
   created_at: string;
   due_date: string | null;
   priority: "low" | "medium" | "high";
-  status: "todo" | "in_progress" | "done";
 }
 
 export interface KanbanColumn {

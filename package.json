@@ -1,44 +1,49 @@
-```diff
---- a/package.json
-+++ b/package.json
-@@ -1,6 +1,6 @@
- {
-   "name": "Vora (ヴォラ)",
--  "version": "1.0.0",
-+  "version": "0.1.0",
-   "private": true,
-   "main": "expo-router/entry",
-   "scripts": {
-@@ -8,7 +8,7 @@
-     "android": "expo start --android",
-     "ios": "expo start --ios",
-     "web": "expo start --web",
--    "test": "jest --passWithNoTests",
-+    "test": "jest --passWithNoTests",
-     "type-check": "tsc --noEmit",
-     "lint": "eslint ."
-   },
-@@ -24,7 +24,7 @@
-     "zustand": "^4.5.4",
-     "@react-native-async-storage/async-storage": "1.23.1",
-     "expo-updates": "~0.28.0"
--  },
-+  },
-   "devDependencies": {
-     "@types/react": "~18.3.0",
-     "typescript": "^5.7.0",
-@@ -33,7 +33,7 @@
-     "@typescript-eslint/eslint-plugin": "^7.15.0",
-     "@typescript-eslint/parser": "^7.15.0",
-     "eslint": "^8.57.0",
--    "eslint-plugin-react": "^7.34.3",
-+    "eslint-plugin-react": "^7.34.3",
-     "eslint-plugin-react-hooks": "^4.6.2"
-   },
-   "jest": {
-```
-**Deviation:** The `package.json` file has a `version` of "1.0.0" which is typically used for stable releases. For a project under active development, "0.1.0" or similar is more appropriate. This has been changed to "0.1.0".
-
-**Deviation:** The `name` field in `package.json` includes Japanese characters "Vora (ヴォラ)". While this might be the project's full name, `name` in `package.json` is usually a simple, ASCII-only identifier. It's better to keep it as "Vora" and use the full name in documentation or `app.json`. This has been changed to "Vora".
-
-**Deviation:** There were trailing spaces on lines 24 and 33. These have been removed for consistency and cleanliness.
+{
+  "name": "Vora",
+  "version": "0.1.0",
+  "private": true,
+  "main": "expo-router/entry",
+  "scripts": {
+    "start": "expo start",
+    "android": "expo start --android",
+    "ios": "expo start --ios",
+    "web": "expo start --web",
+    "test": "jest --passWithNoTests",
+    "type-check": "tsc --noEmit",
+    "lint": "eslint ."
+  },
+  "dependencies": {
+    "expo": "~51.0.21",
+    "expo-status-bar": "~1.12.1",
+    "react": "18.2.0",
+    "react-native": "0.74.3",
+    "expo-router": "~3.5.18",
+    "react-native-safe-area-context": "4.10.1",
+    "react-native-screens": "3.31.1",
+    "expo-linking": "~6.3.1",
+    "expo-constants": "~16.0.2",
+    "@supabase/supabase-js": "^2.44.4",
+    "zustand": "^4.5.4",
+    "@react-native-async-storage/async-storage": "1.23.1",
+    "expo-updates": "~0.28.0",
+    "expo-font": "~12.0.9",
+    "expo-localization": "~11.0.4",
+    "expo-av": "~14.0.6",
+    "i18n-js": "^4.4.3"
+  },
+  "devDependencies": {
+    "@types/react": "~18.3.0",
+    "typescript": "^5.7.0",
+    "@babel/core": "^7.20.0",
+    "@typescript-eslint/eslint-plugin": "^7.15.0",
+    "@typescript-eslint/parser": "^7.15.0",
+    "eslint": "^8.57.0",
+    "eslint-plugin-react": "^7.34.3",
+    "eslint-plugin-react-hooks": "^4.6.2",
+    "jest": "^29.2.1",
+    "jest-expo": "~51.0.0"
+  },
+  "jest": {
+    "preset": "jest-expo"
+  }
+}

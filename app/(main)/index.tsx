@@ -1,27 +1,64 @@
-```diff
---- a/app/(main)/index.tsx
-+++ b/app/(main)/index.tsx
-@@ -1,10 +1,9 @@
- import { StyleSheet, Text, View, Button } from "react-native";
- import { t, isRTL } from "@/i18n";
- import { supabase } from "@/lib/supabase";
--import { useRouter } from "expo-router";
-+import { useRouter, Stack } from "expo-router";
- import { useAuthStore } from "@/stores/authStore";
--import { Stack } from "expo-router"; // Import Stack
--
-+
- export default function HomeScreen(): JSX.Element {
-   const router = useRouter();
-   const clearSession = useAuthStore((state) => state.clearSession);
-@@ -21,7 +20,7 @@
- 
-   return (
-     <View style={[styles.container, isRTL && styles.rtlContainer]}>
--      <Stack.Screen options={{ headerShown: false }} /> {/* Hide header for this specific screen */}
-+      <Stack.Screen options={{ headerShown: false }} />
-       <Text style={[styles.title, isRTL && styles.rtlText]}>{t("home.title")}</Text>
-       <Text style={[styles.subtitle, isRTL && styles.rtlText]}>{t("home.subtitle")}</Text>
-       <Button title={t("home.signOutButton")} onPress={handleSignOut} />
-```
-**Deviation:** Removed a redundant comment `// Import Stack` as `Stack` is imported and used. Also removed a redundant comment `// Hide header for this specific screen` as the `headerShown: false` option is self-explanatory.
+import { StyleSheet, Text, View, Button } from "react-native";
+import { t, isRTL } from "@/i18n";
+import { supabase } from "@/lib/supabase";
+import { useRouter, Stack } from "expo-router";
+import { useAuthStore } from "@/stores/authStore";
+import { VoiceInputButton } from "@/src/components/voice-input-button"; // Import VoiceInputButton
+
+export default function HomeScreen(): JSX.Element {
+  const router = useRouter();
+  const clearSession = useAuthStore((state) => state.clearSession);
+
+  const handleSignOut = async (): Promise<void> => {
+    const { error } = await supabase.auth.signOut();
+    if (error) {
+      console.error("Error signing out:", error.message);
+    }
+    clearSession(); // Clear session from Zustand store
+    router.replace("/(auth)/sign-in"); // Redirect to sign-in page
+  };
+
+  const handleCardCreated = (cardText: string): void => {
+    console.log("Card created with text:", cardText);
+    // Optionally navigate to the board or show a toast
+  };
+
+  return (
+    <View style={[styles.container, isRTL && styles.rtlContainer]}>
+      <Stack.Screen options={{ headerShown: false }} />
+      <Text style={[styles.title, isRTL && styles.rtlText]}>{t("home.title")}</Text>
+      <Text style={[styles.subtitle, isRTL && styles.rtlText]}>{t("home.subtitle")}</Text>
+      <VoiceInputButton onCardCreated={handleCardCreated} /> {/* Integrate VoiceInputButton */}
+      <Button title={t("home.signOutButton")} onPress={handleSignOut} />
+      <Button title={t("home.goToKanbanBoards")} onPress={() => router.push("/(main)/kanban")} />
+    </View>
+  );
+}
+
+const styles = StyleSheet.create({
+  container: {
+    flex: 1,
+    alignItems: "center",
+    justifyContent: "center",
+    padding: 24,
+    backgroundColor: "#f0f2f5",
+  },
+  rtlContainer: {
+    // Specific RTL layout adjustments if needed
+  },
+  title: {
+    fontSize: 24,
+    fontWeight: "bold",
+    marginBottom: 10,
+    color: "#333",
+  },
+  subtitle: {
+    fontSize: 16,
+    color: "#666",
+    textAlign: "center",
+    marginBottom: 20,
+  },
+  rtlText: {
+    textAlign: "right",
+  },
+});

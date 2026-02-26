@@ -1,22 +1,25 @@
-```diff
---- a/tsconfig.json
-+++ b/tsconfig.json
-@@ -1,6 +1,6 @@
- {
-   "extends": "expo/tsconfig.base",
--  "compilerOptions": {
-+  "compilerOptions": {
-     "strict": true,
-     "noUncheckedIndexedAccess": true,
-     "exactOptionalPropertyTypes": true,
-@@ -11,7 +11,7 @@
-         "./*"
-       ]
-     }
--  },
-+  },
-   "include": [
-     "**/*.ts",
-     "**/*.tsx",
-```
-**Deviation:** There was a trailing space on line 5. This has been removed for consistency and cleanliness.
+{
+  "extends": "expo/tsconfig.base",
+  "compilerOptions": {
+    "strict": true,
+    "noUncheckedIndexedAccess": true,
+    "exactOptionalPropertyTypes": true,
+    "noImplicitReturns": true,
+    "noFallthroughCasesInSwitch": true,
+    "baseUrl": ".",
+    "paths": {
+      "@/*": [
+        "src/*"
+      ],
+      "@/src/*": [
+        "src/*"
+      ]
+    }
+  },
+  "include": [
+    "**/*.ts",
+    "**/*.tsx",
+    ".expo/types/**/*.ts",
+    "expo-env.d.ts"
+  ]
+}

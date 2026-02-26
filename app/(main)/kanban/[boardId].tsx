@@ -2,9 +2,15 @@ import React from "react";
 import { View, Text, StyleSheet } from "react-native";
 import { Stack, useLocalSearchParams } from "expo-router";
 import { t, isRTL } from "@/i18n";
+import { VoiceInputButton } from "@/src/components/voice-input-button"; // Import VoiceInputButton
 
 export default function KanbanBoardDetailScreen(): JSX.Element {
   const { boardId } = useLocalSearchParams<{ boardId: string }>();
+
+  const handleCardCreated = (cardText: string): void => {
+    console.log(`Card created in board ${boardId} with text:`, cardText);
+    // Optionally refresh the board view or show a toast
+  };
 
   return (
     <View style={[styles.container, isRTL && styles.rtlContainer]}>
@@ -16,6 +22,9 @@ export default function KanbanBoardDetailScreen(): JSX.Element {
         {t("kanban.boardDetailPlaceholder")}
       </Text>
       {/* Kanban board details and columns/cards will be rendered here */}
+      {boardId && (
+        <VoiceInputButton boardId={boardId} onCardCreated={handleCardCreated} />
+      )}
     </View>
   );
 }

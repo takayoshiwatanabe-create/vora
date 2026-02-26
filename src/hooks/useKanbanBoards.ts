@@ -13,7 +13,7 @@ interface UseKanbanBoardsResult {
 
 export function useKanbanBoards(): UseKanbanBoardsResult {
   const [boards, setBoards] = useState<KanbanBoard[]>([]);
-  const [loading, setLoading] = useState<boolean>(false); // Initialize as false, will be true on first fetch
+  const [loading, setLoading] = useState<boolean>(true); // Initialize as true to show loading on first fetch
   const [error, setError] = useState<PostgrestError | null>(null); // Changed error type
   const session = useAuthStore((state) => state.session);
 

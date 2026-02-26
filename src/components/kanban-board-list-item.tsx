@@ -1,40 +1,43 @@
 import React from "react";
 import { View, Text, StyleSheet, TouchableOpacity } from "react-native";
+import { Link } from "expo-router"; // Use Link from expo-router for navigation
 import { KanbanBoard } from "@/src/types/kanban";
-import { t, isRTL, lang } from "@/i18n";
-import { Link } from "expo-router";
+import { t, isRTL, lang } from "@/i18n"; // Import lang for locale
 
 interface KanbanBoardListItemProps {
   board: KanbanBoard;
+  // Removed onPress as Link handles navigation
 }
 
-export function KanbanBoardListItem({ board }: KanbanBoardListItemProps) {
+export function KanbanBoardListItem({ board }: KanbanBoardListItemProps): JSX.Element {
   const formattedDate = new Date(board.created_at).toLocaleDateString(lang, {
     year: "numeric",
     month: "short",
     day: "numeric",
   });
+
   return (
     <Link href={`/(main)/kanban/${board.id}`} asChild>
-      <TouchableOpacity style={[styles.container, isRTL && styles.rtlContainer]}>
-        <View style={styles.textContainer}>
-          <Text style={[styles.title, isRTL && styles.rtlText]}>{board.name}</Text>
-          {board.description && (
-            <Text style={[styles.description, isRTL && styles.rtlText]}>
-              {board.description}
-            </Text>
-          )}
-          <Text style={[styles.date, isRTL && styles.rtlText]}>
-            {t("kanban.boardCreated", { date: formattedDate })}
+      <TouchableOpacity style={[styles.card, isRTL && styles.rtlCard]}>
+        <Text style={[styles.title, isRTL && styles.rtlText]}>{board.name}</Text>
+        {board.description && (
+          <Text style={[styles.description, isRTL && styles.rtlText]}>
+            {board.description}
           </Text>
-        </View>
+        )}
+        <Text style={[styles.date, isRTL && styles.rtlText]}>
+          {t("kanban.boardCreated", { date: formattedDate })}
+        </Text>
+        <Text style={[styles.cardCount, isRTL && styles.rtlText]}>
+          {t("kanban.boardItemDescription", { count: board.card_count })}
+        </Text>
       </TouchableOpacity>
     </Link>
   );
 }
 
 const styles = StyleSheet.create({
-  container: {
+  card: {
     backgroundColor: "#fff",
     padding: 15,
     borderRadius: 8,
@@ -45,11 +48,8 @@ const styles = StyleSheet.create({
     shadowRadius: 1.41,
     elevation: 2,
   },
-  rtlContainer: {
+  rtlCard: {
     // Specific RTL layout adjustments if needed
-  },
-  textContainer: {
-    flex: 1,
   },
   title: {
     fontSize: 18,
@@ -65,6 +65,12 @@ const styles = StyleSheet.create({
   date: {
     fontSize: 12,
     color: "#999",
+    marginBottom: 5,
+  },
+  cardCount: {
+    fontSize: 14,
+    color: "#555",
+    marginTop: 5,
   },
   rtlText: {
     textAlign: "right",

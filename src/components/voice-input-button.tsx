@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState } from "react";
 import {
   TouchableOpacity,
   Text,
@@ -9,128 +9,97 @@ import {
 } from "react-native";
 import * as FileSystem from "expo-file-system";
 import { t, isRTL } from "@/i18n";
-import { useVoiceRecording } from "@/src/hooks/useVoiceRecording";
-import { createKanbanCard } from "@/src/api/ai"; // Assuming this API exists
 import { useAuthStore } from "@/stores/authStore";
-import { useRouter } from "expo-router";
+import { useVoiceRecording } from "@/src/hooks/useVoiceRecording"; // Use the custom hook
+import { createKanbanCard } from "@/src/api/ai"; // Import the API function
 
 interface VoiceInputButtonProps {
+  boardId?: string; // Optional boardId for context
   onCardCreated?: (cardText: string) => void;
-  boardId?: string; // Optional boardId for creating cards in a specific board
 }
 
 export function VoiceInputButton({
-  onCardCreated,
   boardId,
+  onCardCreated,
 }: VoiceInputButtonProps): JSX.Element {
   const {
     isRecording,
-    recordingDuration,
+    audioUri,
     startRecording,
     stopRecording,
-    audioUri,
     clearRecording,
-    permissionResponse,
-    requestPermission,
-  } = useVoiceRecording();
+  } = useVoiceRecording(); // Destructure from the hook
   const [isProcessing, setIsProcessing] = useState<boolean>(false);
   const session = useAuthStore((state) => state.session);
-  const router = useRouter();
 
-  useEffect(() => {
-    if (!permissionResponse?.granted) {
-      void requestPermission();
-    }
-  }, [permissionResponse, requestPermission]);
-
-  useEffect(() => {
-    // When audioUri is available after stopping recording, process it
-    if (audioUri && !isProcessing) {
-      void processAudio(audioUri);
-    }
-  }, [audioUri, isProcessing]); // Added isProcessing to dependencies
-
-  const processAudio = async (uri: string): Promise<void> => {
-    if (!session?.access_token) {
-      Alert.alert(t("common.error"), t("auth.notAuthenticated"));
-      router.replace("/(auth)/sign-in");
-      return;
-    }
-
-    setIsProcessing(true);
-    try {
-      const base64Audio = await FileSystem.readAsStringAsync(uri, {
-        encoding: FileSystem.EncodingType.Base64,
-      });
-
-      // Send to Edge Function for Whisper transcription and card creation
-      const card = await createKanbanCard(
-        base64Audio,
-        session.access_token,
-        boardId
-      );
-
-      if (card) {
-        Alert.alert(
-          t("voiceInput.successTitle"),
-          t("voiceInput.successMessage", { text: card.title })
-        );
-        onCardCreated?.(card.title);
-      } else {
-        Alert.alert(t("voiceInput.errorTitle"), t("voiceInput.noTextFound"));
-      }
-    } catch (error: unknown) {
-      console.error("Error processing audio:", error);
-      Alert.alert(
-        t("voiceInput.errorTitle"),
-        (error as Error).message || t("voiceInput.processingError")
-      );
-    } finally {
-      setIsProcessing(false);
-      clearRecording(); // Clear the recording after processing
-    }
-  };
-
-  const handlePress = async (): Promise<void> => {
-    if (!permissionResponse?.granted) {
-      const permission = await requestPermission();
-      if (!permission?.granted) {
-        Alert.alert(
-          t("voiceInput.permissionDeniedTitle"),
-          t("voiceInput.permissionDeniedMessage")
-        );
-        return;
-      }
-    }
-
+  const handleRecordingAction = async (): Promise<void> => {
     if (isRecording) {
       await stopRecording();
+      // Audio processing will be triggered by the useEffect below when audioUri changes
     } else {
+      clearRecording(); // Clear any previous recording before starting a new one
       await startRecording();
     }
   };
 
-  const formatDuration = (seconds: number): string => {
-    const minutes = Math.floor(seconds / 60);
-    const remainingSeconds = seconds % 60;
-    return `${minutes.toString().padStart(2, "0")}:${remainingSeconds
-      .toString()
-      .padStart(2, "0")}`;
-  };
+  // Effect to handle audioUri change after recording stops
+  React.useEffect(() => {
+    const processAudio = async (): Promise<void> => {
+      if (audioUri) {
+        setIsProcessing(true);
+        try {
+          const fileBase64 = await FileSystem.readAsStringAsync(audioUri, {
+            encoding: FileSystem.EncodingType.Base64,
+          });
+
+          if (!session?.access_token) {
+            Alert.alert(t("common.error"), t("auth.notAuthenticated"));
+            return;
+          }
+
+          const card = await createKanbanCard(
+            fileBase64,
+            session.access_token,
+            boardId
+          );
+
+          if (card) {
+            Alert.alert(
+              t("voiceInput.successTitle"),
+              t("voiceInput.successMessage", { text: card.title })
+            );
+            onCardCreated?.(card.title);
+          } else {
+            Alert.alert(t("voiceInput.errorTitle"), t("api.ai.noCardReturned"));
+          }
+        } catch (err: unknown) {
+          console.error("Failed to process audio:", err);
+          Alert.alert(
+            t("voiceInput.errorTitle"),
+            (err as Error).message || t("voiceInput.processingError")
+          );
+        } finally {
+          setIsProcessing(false);
+          clearRecording(); // Clear the audioUri after processing
+        }
+      }
+    };
+
+    void processAudio();
+  }, [audioUri, session, boardId, onCardCreated, clearRecording]);
 
   return (
     <View style={[styles.container, isRTL && styles.rtlContainer]}>
       <TouchableOpacity
         style={[
           styles.button,
-          isRecording && styles.buttonRecording,
-          isProcessing && styles.buttonProcessing,
+          isRecording ? styles.buttonRecording : styles.buttonIdle,
         ]}
-        onPress={handlePress}
+        onPress={handleRecordingAction}
         disabled={isProcessing}
       >
         {isProcessing ? (
-          <ActivityIndicator color="#fff" size="small" />
+          <ActivityIndicator color="#fff" />
         ) : (
           <Text style={styles.buttonText}>
             {isRecording
@@ -139,11 +108,6 @@ export function VoiceInputButton({
           </Text>
         )}
       </TouchableOpacity>
-      {isRecording && (
-        <Text style={[styles.durationText, isRTL && styles.rtlText]}>
-          {formatDuration(recordingDuration)}
-        </Text>
-      )}
       {isProcessing && (
         <Text style={[styles.processingText, isRTL && styles.rtlText]}>
           {t("voiceInput.processingAudio")}
@@ -162,40 +126,32 @@ const styles = StyleSheet.create({
     // Specific RTL layout adjustments if needed
   },
   button: {
-    backgroundColor: "#007bff",
-    paddingVertical: 15,
-    paddingHorizontal: 30,
-    borderRadius: 30,
-    minWidth: 200,
-    alignItems: "center",
+    width: 150,
+    height: 150,
+    borderRadius: 75,
     justifyContent: "center",
+    alignItems: "center",
     shadowColor: "#000",
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.25,
     shadowRadius: 3.84,
     elevation: 5,
   },
-  buttonRecording: {
-    backgroundColor: "#dc3545", // Red for recording
+  buttonIdle: {
+    backgroundColor: "#007bff",
   },
-  buttonProcessing: {
-    backgroundColor: "#ffc107", // Yellow for processing
+  buttonRecording: {
+    backgroundColor: "#dc3545",
   },
   buttonText: {
     color: "#fff",
     fontSize: 18,
     fontWeight: "bold",
   },
-  durationText: {
-    marginTop: 10,
-    fontSize: 16,
-    color: "#555",
-  },
   processingText: {
     marginTop: 10,
     fontSize: 16,
-    color: "#007bff",
-    fontWeight: "bold",
+    color: "#666",
   },
   rtlText: {
     textAlign: "right",

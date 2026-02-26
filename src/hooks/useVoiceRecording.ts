@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef, useCallback } from "react";
 import { Audio } from "expo-av";
-import * as FileSystem from "expo-file-system";
+import *as FileSystem from "expo-file-system";
 import { PermissionResponse } from "expo-modules-core";
 import { Alert } from "react-native";
 import { t } from "@/i18n";

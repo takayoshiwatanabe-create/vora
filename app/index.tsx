@@ -24,6 +24,7 @@ export default function HomeScreen() {
       <Text style={[styles.title, isRTL && styles.rtlText]}>{t("home.title")}</Text>
       <Text style={[styles.subtitle, isRTL && styles.rtlText]}>{t("home.subtitle")}</Text>
       <Button title={t("home.signOutButton")} onPress={handleSignOut} />
+      <Button title={t("kanban.boardListTitle")} onPress={() => router.push("/(main)/kanban")} />
     </View>
   );
 }
@@ -55,4 +56,5 @@ const styles = StyleSheet.create({
     textAlign: "right",
   },
 });
+
 

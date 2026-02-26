@@ -3,11 +3,11 @@ import { StatusBar } from "expo-status-bar";
 import { SafeAreaProvider } from "react-native-safe-area-context";
 import { isRTL } from "@/i18n";
 import { I18nManager } from "react-native";
-import { useEffect, useState } from "react"; // Import useState
+import { useEffect, useState } from "react";
 import { useFonts } from "expo-font";
-import { useAuthStore } from "@/stores/authStore"; // Import Zustand store
-import { supabase } from "@/lib/supabase"; // Import supabase client
-import { Session } from "@supabase/supabase-js";
+import { useAuthStore } from "@/stores/authStore";
+import { supabase } from "@/lib/supabase";
+import * as Updates from 'expo-updates'; // Import expo-updates
 
 // Prevent the splash screen from auto-hiding before asset loading is complete.
 SplashScreen.preventAutoHideAsync();
@@ -16,7 +16,7 @@ export default function RootLayout() {
   const router = useRouter();
   const session = useAuthStore((state) => state.session);
   const setSession = useAuthStore((state) => state.setSession);
-  const [appIsReady, setAppIsReady] = useState(false); // New state for app readiness
+  const [appIsReady, setAppIsReady] = useState(false);
 
   // Load fonts (example, replace with actual fonts if needed)
   const [fontsLoaded] = useFonts({
@@ -37,7 +37,9 @@ export default function RootLayout() {
           // and then reloading the app if the RTL setting changes.
           // For now, we'll rely on the initial setting and user restarting if needed.
           // If you want to force a reload for development, uncomment the line below:
-          // Updates.reloadAsync(); // Requires 'expo-updates'
+          if (Updates.isEmbedded) { // Check if updates are available before reloading
+            await Updates.reloadAsync(); // Requires 'expo-updates'
+          }
         }
 
         // Fetch initial session and update Zustand store
@@ -85,7 +87,7 @@ export default function RootLayout() {
       <Stack>
         {/* The root layout now handles the routing based on session state */}
         <Stack.Screen name="(auth)" options={{ headerShown: false }} />
-        <Stack.Screen name="index" options={{ title: "Vora (ヴォラ)" }} />
+        <Stack.Screen name="(main)" options={{ headerShown: false }} /> {/* Add (main) layout */}
       </Stack>
       <StatusBar style="auto" />
     </SafeAreaProvider>

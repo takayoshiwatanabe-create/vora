@@ -1,7 +1,7 @@
 import React from "react";
 import { View, Text, StyleSheet, TouchableOpacity } from "react-native";
 import { Link } from "expo-router"; // Use Link from expo-router for navigation
-import { KanbanBoard } from "@/src/types/kanban"; // Corrected import path
+import { KanbanBoard } from "@/types/kanban"; // Corrected import path
 import { t, isRTL, lang } from "@/i18n"; // Import lang for locale
 
 interface KanbanBoardListItemProps {
@@ -18,17 +18,17 @@ export function KanbanBoardListItem({ board }: KanbanBoardListItemProps): JSX.El
 
   return (
     <Link href={`/(main)/kanban/${board.id}`} asChild>
-      <TouchableOpacity style={[styles.card, isRTL && styles.rtlCard]}>
-        <Text style={[styles.title, isRTL && styles.rtlText]}>{board.name}</Text>
+      <TouchableOpacity style={[styles.card, isRTL ? styles.rtlCard : null]}>
+        <Text style={[styles.title, isRTL ? styles.rtlText : null]}>{board.name}</Text>
         {board.description && (
-          <Text style={[styles.description, isRTL && styles.rtlText]}>
+          <Text style={[styles.description, isRTL ? styles.rtlText : null]}>
             {board.description}
           </Text>
         )}
-        <Text style={[styles.date, isRTL && styles.rtlText]}>
+        <Text style={[styles.date, isRTL ? styles.rtlText : null]}>
           {t("kanban.boardCreated", { date: formattedDate })}
         </Text>
-        <Text style={[styles.cardCount, isRTL && styles.rtlText]}>
+        <Text style={[styles.cardCount, isRTL ? styles.rtlText : null]}>
           {t("kanban.boardItemDescription", { count: board.card_count })}
         </Text>
       </TouchableOpacity>

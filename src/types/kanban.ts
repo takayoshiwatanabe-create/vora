@@ -1,31 +1,22 @@
 // src/types/kanban.ts
+
+export type KanbanCardStatus = "todo" | "in_progress" | "done";
+
 export interface KanbanBoard {
   id: string;
   user_id: string;
   name: string;
   description: string | null;
   created_at: string;
-  card_count: number;
+  card_count: number; // Denormalized count for display
 }
 
 export interface KanbanCard {
   id: string;
   board_id: string;
-  column_id: string;
-  user_id: string;
   title: string;
   description: string | null;
-  created_at: string;
-  due_date: string | null;
-  priority: "low" | "medium" | "high";
-}
-
-export interface KanbanColumn {
-  id: string;
-  board_id: string;
-  user_id: string;
-  name: string;
-  order: number;
+  status: KanbanCardStatus;
   created_at: string;
 }
 

@@ -1,7 +1,7 @@
 import React from "react";
 import { View, Text, StyleSheet, TouchableOpacity } from "react-native";
 import { Link } from "expo-router"; // Use Link from expo-router for navigation
-import { KanbanBoard } from "@/src/types/kanban"; // Corrected import path
+import { KanbanBoard } from "@/types/kanban";
 import { t, isRTL, lang } from "@/i18n"; // Import lang for locale
 
 interface KanbanBoardListItemProps {
@@ -18,18 +18,23 @@ export function KanbanBoardListItem({ board }: KanbanBoardListItemProps): JSX.El
 
   return (
     <Link href={`/(main)/kanban/${board.id}`} asChild>
-      <TouchableOpacity style={[styles.card, isRTL && styles.rtlCard]}>
+      <TouchableOpacity
+        style={[styles.card, isRTL && styles.rtlCard]}
+        accessibilityRole="link" // Indicate it's a link for screen readers
+        accessibilityLabel={t("kanban.boardAccessibilityLabel", { boardName: board.name })}
+        accessibilityHint={t("kanban.boardAccessibilityHint", { boardName: board.name })}
+      >
         <Text style={[styles.title, isRTL && styles.rtlText]}>{board.name}</Text>
         {board.description && (
           <Text style={[styles.description, isRTL && styles.rtlText]}>
             {board.description}
           </Text>
         )}
-        <Text style={[styles.date, isRTL && styles.rtlText]}>
-          {t("kanban.boardCreated", { date: formattedDate })}
-        </Text>
         <Text style={[styles.cardCount, isRTL && styles.rtlText]}>
           {t("kanban.boardItemDescription", { count: board.card_count })}
+        </Text>
+        <Text style={[styles.date, isRTL && styles.rtlText]}>
+          {t("kanban.boardCreated", { date: formattedDate })}
         </Text>
       </TouchableOpacity>
     </Link>
@@ -65,16 +70,14 @@ const styles = StyleSheet.create({
   date: {
     fontSize: 12,
     color: "#999",
-    marginBottom: 5,
+    marginTop: 5, // Moved below cardCount as per typical display order
   },
   cardCount: {
     fontSize: 14,
     color: "#555",
-    marginTop: 5,
+    marginBottom: 5, // Added margin for separation
   },
   rtlText: {
     textAlign: "right",
   },
 });
-
-

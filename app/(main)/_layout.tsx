@@ -16,8 +16,13 @@ export default function MainLayout(): JSX.Element {
         name="kanban/[boardId]"
         options={{ title: t("kanban.boardDetailTitle") }}
       />
+      <Stack.Screen
+        name="settings"
+        options={{ title: t("settings.title") }}
+      />
     </Stack>
   );
 }
+
 
 

@@ -11,7 +11,7 @@ import {
 } from "react-native";
 import { Stack, useRouter } from "expo-router";
 import { t, isRTL, lang } from "@/i18n";
-import { UserProfile } from "@/src/components/user-profile";
+import { UserProfile } from "@/components/user-profile";
 import { supabase } from "@/lib/supabase";
 import { useAuthStore } from "@/stores/authStore";
 import { I18nManager } from "react-native";
@@ -119,28 +119,28 @@ export default function SettingsScreen(): JSX.Element {
 
   return (
     <ScrollView
-      style={[styles.container, isRTL && styles.rtlContainer]}
+      style={[styles.container, isRTL ? styles.rtlContainer : null]}
       contentContainerStyle={styles.contentContainer}
     >
       <Stack.Screen options={{ title: t("settings.title") }} />
 
-      <Text style={[styles.sectionTitle, isRTL && styles.rtlText]}>
+      <Text style={[styles.sectionTitle, isRTL ? styles.rtlText : null]}>
         {t("settings.accountSection")}
       </Text>
       {user ? (
         <UserProfile user={user} />
       ) : (
-        <Text style={[styles.infoText, isRTL && styles.rtlText]}>
+        <Text style={[styles.infoText, isRTL ? styles.rtlText : null]}>
           {t("auth.notAuthenticated")}
         </Text>
       )}
 
-      <Text style={[styles.sectionTitle, isRTL && styles.rtlText]}>
+      <Text style={[styles.sectionTitle, isRTL ? styles.rtlText : null]}>
         {t("settings.generalSection")}
       </Text>
 
-      <View style={[styles.settingItem, isRTL && styles.rtlSettingItem]}>
-        <Text style={[styles.settingLabel, isRTL && styles.rtlText]}>
+      <View style={[styles.settingItem, isRTL ? styles.rtlSettingItem : null]}>
+        <Text style={[styles.settingLabel, isRTL ? styles.rtlText : null]}>
           {t("settings.languageSetting")}
         </Text>
         <View style={styles.languageOptions}>
@@ -166,8 +166,8 @@ export default function SettingsScreen(): JSX.Element {
         </View>
       </View>
 
-      <View style={[styles.settingItem, isRTL && styles.rtlSettingItem]}>
-        <Text style={[styles.settingLabel, isRTL && styles.rtlText]}>
+      <View style={[styles.settingItem, isRTL ? styles.rtlSettingItem : null]}>
+        <Text style={[styles.settingLabel, isRTL ? styles.rtlText : null]}>
           {t("settings.notificationsSetting")}
         </Text>
         <Switch
@@ -178,8 +178,8 @@ export default function SettingsScreen(): JSX.Element {
         />
       </View>
 
-      <View style={[styles.settingItem, isRTL && styles.rtlSettingItem]}>
-        <Text style={[styles.settingLabel, isRTL && styles.rtlText]}>
+      <View style={[styles.settingItem, isRTL ? styles.rtlSettingItem : null]}>
+        <Text style={[styles.settingLabel, isRTL ? styles.rtlText : null]}>
           {t("settings.darkModeSetting")}
         </Text>
         <Switch
@@ -190,13 +190,13 @@ export default function SettingsScreen(): JSX.Element {
         />
       </View>
 
-      <Text style={[styles.sectionTitle, isRTL && styles.rtlText]}>
+      <Text style={[styles.sectionTitle, isRTL ? styles.rtlText : null]}>
         {t("settings.privacySection")}
       </Text>
-      <Text style={[styles.privacyText, isRTL && styles.rtlText]}>
+      <Text style={[styles.privacyText, isRTL ? styles.rtlText : null]}>
         {t("settings.privacyPolicyText")}
       </Text>
-      <Text style={[styles.privacyText, isRTL && styles.rtlText]}>
+      <Text style={[styles.privacyText, isRTL ? styles.rtlText : null]}>
         {t("settings.voiceDataPolicy")}
       </Text>
 

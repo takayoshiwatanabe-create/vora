@@ -9,10 +9,10 @@ interface UserProfileProps {
 
 export function UserProfile({ user }: UserProfileProps): JSX.Element {
   const avatarUrl = user.user_metadata?.avatar_url as string | undefined;
-  const displayName = user.user_metadata?.full_name as string | undefined || user.email;
+  const displayName = (user.user_metadata?.full_name as string | undefined) || user.email;
 
   return (
-    <View style={[styles.container, isRTL && styles.rtlContainer]}>
+    <View style={[styles.container, isRTL ? styles.rtlContainer : null]}>
       {avatarUrl ? (
         <Image source={{ uri: avatarUrl }} style={styles.avatar} />
       ) : (
@@ -23,15 +23,15 @@ export function UserProfile({ user }: UserProfileProps): JSX.Element {
         </View>
       )}
       <View style={styles.userInfo}>
-        <Text style={[styles.displayName, isRTL && styles.rtlText]}>
+        <Text style={[styles.displayName, isRTL ? styles.rtlText : null]}>
           {displayName}
         </Text>
         {user.email && (
-          <Text style={[styles.email, isRTL && styles.rtlText]}>
+          <Text style={[styles.email, isRTL ? styles.rtlText : null]}>
             {user.email}
           </Text>
         )}
-        <Text style={[styles.userId, isRTL && styles.rtlText]}>
+        <Text style={[styles.userId, isRTL ? styles.rtlText : null]}>
           {t("settings.userIdDisplay", { id: user.id })}
         </Text>
       </View>

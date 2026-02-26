@@ -9,29 +9,36 @@ interface UserProfileProps {
 
 export function UserProfile({ user }: UserProfileProps): JSX.Element {
   const avatarUrl = user.user_metadata?.avatar_url as string | undefined;
-  const displayName = (user.user_metadata?.full_name as string | undefined) || user.email;
+  const displayName = user.user_metadata?.full_name as string | undefined || user.email;
 
   return (
-    <View style={[styles.container, isRTL && styles.rtlContainer]}>
+    <View style={[styles.container, isRTL && styles.rtlContainer]} accessibilityRole="summary">
       {avatarUrl ? (
-        <Image source={{ uri: avatarUrl }} style={styles.avatar} />
+        <Image
+          source={{ uri: avatarUrl }}
+          style={styles.avatar}
+          accessibilityLabel={t("settings.userAvatar", { userName: displayName })}
+        />
       ) : (
-        <View style={styles.avatarPlaceholder}>
+        <View
+          style={styles.avatarPlaceholder}
+          accessibilityLabel={t("settings.userAvatarPlaceholder", { userName: displayName })}
+        >
           <Text style={styles.avatarPlaceholderText}>
             {displayName ? displayName[0]?.toUpperCase() : "?"}
           </Text>
         </View>
       )}
       <View style={styles.userInfo}>
-        <Text style={[styles.displayName, isRTL && styles.rtlText]}>
+        <Text style={[styles.displayName, isRTL && styles.rtlText]} accessibilityRole="header">
           {displayName}
         </Text>
         {user.email && (
-          <Text style={[styles.email, isRTL && styles.rtlText]}>
+          <Text style={[styles.email, isRTL && styles.rtlText]} accessibilityLabel={t("settings.userEmail", { email: user.email })}>
             {user.email}
           </Text>
         )}
-        <Text style={[styles.userId, isRTL && styles.rtlText]}>
+        <Text style={[styles.userId, isRTL && styles.rtlText]} accessibilityLabel={t("settings.userIdDisplay", { id: user.id })}>
           {t("settings.userIdDisplay", { id: user.id })}
         </Text>
       </View>
@@ -98,5 +105,3 @@ const styles = StyleSheet.create({
     textAlign: "right",
   },
 });
-
-

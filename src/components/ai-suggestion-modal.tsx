@@ -19,7 +19,7 @@ interface AiSuggestionModalProps {
   error: string | null;
   onConfirm: (confirmedSuggestion: KanbanCardSuggestion) => void;
   onCancel: () => void;
-  onEdit: (field: keyof KanbanCardSuggestion, value: string) => void;
+  onEdit: (field: keyof KanbanCardSuggestion, value: string | null) => void; // Allow null for optional fields
 }
 
 export function AiSuggestionModal({
@@ -41,28 +41,34 @@ export function AiSuggestionModal({
       transparent={true}
       visible={isVisible}
       onRequestClose={onCancel}
+      accessibilityViewIsModal={true} // Indicate that this view is a modal for screen readers
     >
       <View style={styles.centeredView}>
         <View style={[styles.modalView, isRTL && styles.rtlModalView]}>
           {loading ? (
             <View style={styles.loadingContainer}>
-              <ActivityIndicator size="large" color="#007bff" />
+              <ActivityIndicator size="large" color="#007bff" accessibilityLabel={t("voiceInput.processingAudio")} />
               <Text style={[styles.loadingText, isRTL && styles.rtlText]}>
                 {t("voiceInput.processingAudio")}
               </Text>
             </View>
           ) : error ? (
             <View style={styles.errorContainer}>
-              <Text style={[styles.errorText, isRTL && styles.rtlText]}>
+              <Text style={[styles.errorText, isRTL && styles.rtlText]} accessibilityLiveRegion="assertive">
                 {t("common.error")}: {error}
               </Text>
-              <TouchableOpacity style={styles.button} onPress={onCancel}>
+              <TouchableOpacity
+                style={styles.button}
+                onPress={onCancel}
+                accessibilityRole="button"
+                accessibilityLabel={t("common.close")}
+              >
                 <Text style={styles.buttonText}>{t("common.close")}</Text>
               </TouchableOpacity>
             </View>
           ) : suggestion ? (
-            <ScrollView style={styles.scrollView}>
-              <Text style={[styles.modalTitle, isRTL && styles.rtlText]}>
+            <ScrollView style={styles.scrollView} accessibilityLabel={t("aiSuggestion.modalContentLabel")}>
+              <Text style={[styles.modalTitle, isRTL && styles.rtlText]} accessibilityRole="header">
                 {t("aiSuggestion.title")}
               </Text>
 
@@ -75,6 +81,8 @@ export function AiSuggestionModal({
                   value={suggestion.cardText}
                   onChangeText={(text) => onEdit("cardText", text)}
                   multiline
+                  accessibilityLabel={t("aiSuggestion.cardTextLabel")}
+                  accessibilityHint={t("aiSuggestion.cardTextHint")}
                 />
               </View>
 
@@ -85,7 +93,9 @@ export function AiSuggestionModal({
                 <TextInput
                   style={[styles.input, isRTL && styles.rtlInput]}
                   value={suggestion.project || ""}
-                  onChangeText={(text) => onEdit("project", text)}
+                  onChangeText={(text) => onEdit("project", text || null)} // Pass null if empty
+                  accessibilityLabel={t("aiSuggestion.projectLabel")}
+                  accessibilityHint={t("aiSuggestion.projectHint")}
                 />
               </View>
 
@@ -96,7 +106,9 @@ export function AiSuggestionModal({
                 <TextInput
                   style={[styles.input, isRTL && styles.rtlInput]}
                   value={suggestion.priority || ""}
-                  onChangeText={(text) => onEdit("priority", text as "low" | "medium" | "high" | null)}
+                  onChangeText={(text) => onEdit("priority", text === "" ? null : (text as "low" | "medium" | "high"))} // Pass null if empty
+                  accessibilityLabel={t("aiSuggestion.priorityLabel")}
+                  accessibilityHint={t("aiSuggestion.priorityHint")}
                 />
               </View>
 
@@ -107,8 +119,10 @@ export function AiSuggestionModal({
                 <TextInput
                   style={[styles.input, isRTL && styles.rtlInput]}
                   value={suggestion.dueDate || ""}
-                  onChangeText={(text) => onEdit("dueDate", text)}
+                  onChangeText={(text) => onEdit("dueDate", text || null)} // Pass null if empty
                   placeholder={t("aiSuggestion.dueDatePlaceholder")}
+                  accessibilityLabel={t("aiSuggestion.dueDateLabel")}
+                  accessibilityHint={t("aiSuggestion.dueDateHint")}
                 />
               </View>
 
@@ -116,12 +130,16 @@ export function AiSuggestionModal({
                 <TouchableOpacity
                   style={[styles.button, styles.cancelButton]}
                   onPress={onCancel}
+                  accessibilityRole="button"
+                  accessibilityLabel={t("aiSuggestion.cancelButton")}
                 >
                   <Text style={styles.buttonText}>{t("aiSuggestion.cancelButton")}</Text>
                 </TouchableOpacity>
                 <TouchableOpacity
                   style={[styles.button, styles.confirmButton]}
                   onPress={() => onConfirm(suggestion)}
+                  accessibilityRole="button"
+                  accessibilityLabel={t("aiSuggestion.confirmButton")}
                 >
                   <Text style={styles.buttonText}>{t("aiSuggestion.confirmButton")}</Text>
                 </TouchableOpacity>
@@ -129,10 +147,15 @@ export function AiSuggestionModal({
             </ScrollView>
           ) : (
             <View style={styles.errorContainer}>
-              <Text style={[styles.errorText, isRTL && styles.rtlText]}>
+              <Text style={[styles.errorText, isRTL && styles.rtlText]} accessibilityLiveRegion="assertive">
                 {t("api.ai.noCardReturned")}
               </Text>
-              <TouchableOpacity style={styles.button} onPress={onCancel}>
+              <TouchableOpacity
+                style={styles.button}
+                onPress={onCancel}
+                accessibilityRole="button"
+                accessibilityLabel={t("common.close")}
+              >
                 <Text style={styles.buttonText}>{t("common.close")}</Text>
               </TouchableOpacity>
             </View>
@@ -253,4 +276,3 @@ const styles = StyleSheet.create({
     textAlign: "right",
   },
 });
-

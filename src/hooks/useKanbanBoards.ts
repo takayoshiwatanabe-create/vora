@@ -1,27 +1,29 @@
 import { useState, useEffect, useCallback } from "react";
 import { supabase } from "@/lib/supabase";
 import { useAuthStore } from "@/stores/authStore";
-import { KanbanBoard } from "@/src/types/kanban"; // Use the type from src/types
-import { PostgrestError } from "@supabase/supabase-js"; // Import PostgrestError
+import { KanbanBoard } from "@/types/kanban";
+import { PostgrestError } from "@supabase/supabase-js";
+import { useQueryClient } from "@tanstack/react-query"; // Import useQueryClient
 
 interface UseKanbanBoardsResult {
-  boards: KanbanBoard[]; // Should always be an array, even if empty
+  boards: KanbanBoard[];
   loading: boolean;
-  error: PostgrestError | null; // Changed error type to PostgrestError
+  error: PostgrestError | null;
   refetch: () => Promise<void>;
 }
 
 export function useKanbanBoards(): UseKanbanBoardsResult {
   const [boards, setBoards] = useState<KanbanBoard[]>([]);
-  const [loading, setLoading] = useState<boolean>(true); // Initialize as true to show loading on first fetch
-  const [error, setError] = useState<PostgrestError | null>(null); // Changed error type
+  const [loading, setLoading] = useState<boolean>(true);
+  const [error, setError] = useState<PostgrestError | null>(null);
   const session = useAuthStore((state) => state.session);
+  const queryClient = useQueryClient(); // Initialize query client
 
   const fetchBoards = useCallback(async (): Promise<void> => {
     if (!session) {
       setBoards([]);
       setLoading(false);
-      setError(null); // Clear error if no session
+      setError(null);
       return;
     }
 
@@ -30,7 +32,7 @@ export function useKanbanBoards(): UseKanbanBoardsResult {
     try {
       const { data, error: fetchError } = await supabase
         .from("kanban_boards")
-        .select("id, user_id, name, description, created_at, card_count") // Explicitly select fields
+        .select("id, user_id, name, description, created_at, card_count")
         .eq("user_id", session.user.id)
         .order("created_at", { ascending: false });
 
@@ -38,19 +40,29 @@ export function useKanbanBoards(): UseKanbanBoardsResult {
         throw fetchError;
       }
       setBoards(data || []);
+      // Invalidate TanStack Query cache for boards after fetching
+      void queryClient.invalidateQueries({ queryKey: ["kanbanBoards", session.user.id] });
     } catch (err: unknown) {
-      // Ensure error is of type PostgrestError or convert to a generic Error
-      setError(err && typeof err === 'object' && 'message' in err && 'code' in err ? err as PostgrestError : { message: String(err), code: 'UNKNOWN_ERROR', details: '', hint: '' });
+      if (err && typeof err === 'object' && 'message' in err) {
+        const postgrestError: PostgrestError = {
+          message: (err as { message: string }).message,
+          code: (err as { code?: string }).code || 'UNKNOWN_ERROR',
+          details: (err as { details?: string }).details || '',
+          hint: (err as { hint?: string }).hint || '',
+        };
+        setError(postgrestError);
+      } else {
+        setError({ message: String(err), code: 'UNKNOWN_ERROR', details: '', hint: '' });
+      }
       setBoards([]);
     } finally {
       setLoading(false);
     }
-  }, [session]);
+  }, [session, queryClient]); // Add queryClient to dependencies
 
   useEffect(() => {
-    void fetchBoards(); // Use void to ignore the Promise
+    void fetchBoards();
   }, [fetchBoards]);
 
-  return { boards, loading, error, refetch: fetchBoards }; // Ensure boards is always an array
+  return { boards, loading, error, refetch: fetchBoards };
 }
-

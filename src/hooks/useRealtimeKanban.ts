@@ -126,4 +126,3 @@ export function useRealtimeKanban(boardId?: string): void {
     };
   }, [session, boardId, queryClient, addBoard, updateBoard, deleteBoard, addCard, updateCard, deleteCard]);
 }
-

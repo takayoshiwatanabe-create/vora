@@ -2,8 +2,8 @@ import React from "react";
 import { View, Text, TouchableOpacity, StyleSheet, Alert, I18nManager } from "react-native";
 import { t, lang as currentLang, isRTL as currentIsRTL } from "@/i18n";
 import { useRouter } from "expo-router";
-import * as Localization from "expo-localization"; // Import Localization for setting locale
-import * as Updates from 'expo-updates'; // Import Updates for reliable reload
+import * as Localization from "expo-localization";
+import * as Updates from 'expo-updates';
 
 interface LanguageSwitcherProps {
   // No props needed for now, but can be extended if specific behavior is required
@@ -15,12 +15,12 @@ export function LanguageSwitcher(_props: LanguageSwitcherProps): JSX.Element {
   const supportedLanguages = [
     { code: "ja", name: "日本語", isRTL: false },
     { code: "en", name: "English", isRTL: false },
-    { code: "zh", name: "中文", isRTL: false },
+    { code: "zh", name: "中文 (简体)", isRTL: false }, // Updated name
     { code: "ko", name: "한국어", isRTL: false },
     { code: "es", name: "Español", isRTL: false },
     { code: "fr", name: "Français", isRTL: false },
     { code: "de", name: "Deutsch", isRTL: false },
-    { code: "pt", name: "Português", isRTL: false },
+    { code: "pt", name: "Português (Brasil)", isRTL: false }, // Updated name
     { code: "ar", name: "العربية", isRTL: true },
     { code: "hi", name: "हिन्दी", isRTL: false },
   ];
@@ -56,16 +56,33 @@ export function LanguageSwitcher(_props: LanguageSwitcherProps): JSX.Element {
     } else {
       // If only language changes without RTL, a simple re-render might be enough.
       // Navigating to root will trigger re-evaluation of _layout.tsx and its children.
-      router.replace("/");
+      // However, for i18n-js to fully re-render all components with new translations,
+      // a full app reload is often the most robust approach, especially if not all
+      // components are reactive to locale changes.
+      // Given the "Liquid Minimal" principle and potential for subtle bugs with partial re-renders,
+      // a full reload is safer for language changes.
+      Alert.alert(
+        t("common.languageChangeTitle"),
+        t("common.languageChangeMessage"),
+        [
+          {
+            text: t("common.restartApp"),
+            onPress: () => {
+              void Updates.reloadAsync();
+            },
+          },
+        ],
+        { cancelable: false }
+      );
     }
   };
 
   return (
     <View style={[styles.container, currentIsRTL && styles.rtlContainer]}>
-      <Text style={[styles.title, currentIsRTL && styles.rtlText]}>
+      <Text style={[styles.title, currentIsRTL && styles.rtlText]} accessibilityRole="header">
         {t("common.selectLanguage")}
       </Text>
-      <View style={styles.languageList}>
+      <View style={styles.languageList} accessibilityRole="menu">
         {supportedLanguages.map((langItem) => (
           <TouchableOpacity
             key={langItem.code}
@@ -74,6 +91,9 @@ export function LanguageSwitcher(_props: LanguageSwitcherProps): JSX.Element {
               currentLang === langItem.code && styles.activeLanguageButton,
             ]}
             onPress={() => void changeLanguage(langItem.code, langItem.isRTL)}
+            accessibilityRole="menuitem"
+            accessibilityLabel={t("common.languageOption", { language: langItem.name })}
+            accessibilityState={{ selected: currentLang === langItem.code }}
           >
             <Text
               style={[
@@ -134,4 +154,3 @@ const styles = StyleSheet.create({
     fontWeight: "bold",
   },
 });
-

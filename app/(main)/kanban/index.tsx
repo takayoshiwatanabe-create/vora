@@ -1,10 +1,10 @@
 import React from "react";
 import { View, Text, StyleSheet, FlatList, ActivityIndicator, Button } from "react-native";
-import { useKanbanBoards } from "@/src/hooks/useKanbanBoards";
-import { KanbanBoardListItem } from "@/src/components/kanban-board-list-item";
+import { useKanbanBoards } from "@/hooks/useKanbanBoards";
+import { KanbanBoardListItem } from "@/components/kanban-board-list-item";
 import { t, isRTL } from "@/i18n";
 import { Stack, useRouter } from "expo-router";
-import { KanbanBoard } from "@/src/types/kanban";
+import { KanbanBoard } from "@/types/kanban";
 
 export default function KanbanBoardsScreen(): JSX.Element {
   const { boards, loading, error, refetch } = useKanbanBoards();
@@ -14,7 +14,7 @@ export default function KanbanBoardsScreen(): JSX.Element {
     return (
       <View style={styles.centered}>
         <ActivityIndicator size="large" color="#007bff" />
-        <Text style={[styles.loadingText, isRTL && styles.rtlText]}>{t("kanban.loadingBoards")}</Text>
+        <Text style={[styles.loadingText, isRTL ? styles.rtlText : null]}>{t("kanban.loadingBoards")}</Text>
       </View>
     );
   }
@@ -22,19 +22,19 @@ export default function KanbanBoardsScreen(): JSX.Element {
   if (error) {
     return (
       <View style={styles.centered}>
-        <Text style={[styles.errorText, isRTL && styles.rtlText]}>{t("kanban.errorLoadingBoards")}: {error.message}</Text>
+        <Text style={[styles.errorText, isRTL ? styles.rtlText : null]}>{t("kanban.errorLoadingBoards")}: {error.message}</Text>
         <Button title={t("kanban.retryButton")} onPress={refetch} />
       </View>
     );
   }
 
   return (
-    <View style={[styles.container, isRTL && styles.rtlContainer]}>
+    <View style={[styles.container, isRTL ? styles.rtlContainer : null]}>
       <Stack.Screen options={{ title: t("kanban.boardsTitle") }} />
-      <Text style={[styles.title, isRTL && styles.rtlText]}>{t("kanban.boardsTitle")}</Text>
+      <Text style={[styles.title, isRTL ? styles.rtlText : null]}>{t("kanban.boardsTitle")}</Text>
       {boards.length === 0 ? (
         <View style={styles.centered}>
-          <Text style={[styles.noBoardsText, isRTL && styles.rtlText]}>{t("kanban.noBoardsFound")}</Text>
+          <Text style={[styles.noBoardsText, isRTL ? styles.rtlText : null]}>{t("kanban.noBoardsFound")}</Text>
           {/* Add a button to create a new board later */}
         </View>
       ) : (

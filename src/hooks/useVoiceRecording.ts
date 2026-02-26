@@ -58,6 +58,10 @@ export function useVoiceRecording(): UseVoiceRecordingResult {
         // For Android, you might want to specify `interruptionModeAndroid`
         // and `shouldDuckAndroid` based on your app's audio behavior.
         // For simplicity, we'll omit them for now.
+        // The spec mentions "Privacy by Design: 音声データは処理後即時削除。永続保存は禁止"
+        // and "音声データの取り扱い: クライアント → Edge Function（Whisper API直接転送）→ テキスト返却 → 音声データ即時廃棄"
+        // This implies that the audio file should be temporary and not persist.
+        // The current `FileSystem.deleteAsync` in `clearRecording` and `useEffect` cleanup handles this.
       });
 
       const { recording } = await Audio.Recording.createAsync(
@@ -151,4 +155,3 @@ export function useVoiceRecording(): UseVoiceRecordingResult {
     requestPermission,
   };
 }
-

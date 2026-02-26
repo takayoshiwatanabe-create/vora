@@ -216,7 +216,244 @@ Enterpriseカスタムモデル = カスタム
 
 ```
 ┌─────────────────────────────────────────────────────────────┐
-│                        CLIENTS
+│                        CLIENTS                              │
+│  (Web/Mobile Apps)                                          │
+│  Next.js 15 (App Router), React 19, Expo (Mobile)           │
+│  Tailwind CSS v4, shadcn/ui (Web), React Native (Mobile)    │
+└─────────────────────────────────────────────────────────────┘
+       │ ▲                                 ▲
+       │ │ (GraphQL/REST API Calls)        │ (Realtime Subscriptions)
+       ▼ ▽                                 │
+┌─────────────────────────────────────────────────────────────┐
+│                        API GATEWAY                          │
+│  (Next.js API Routes / Edge Functions)                      │
+│  Rate Limiting (Upstash Redis)                              │
+└─────────────────────────────────────────────────────────────┘
+       │ ▲                                 ▲
+       │ │ (Auth, Data Access)             │ (Realtime Events)
+       ▼ ▽                                 │
+┌─────────────────────────────────────────────────────────────┐
+│                        SUPABASE                             │
+│  PostgreSQL 16 (DB), Supabase Auth (JWT, OAuth, Magic Link) │
+│  Supabase Realtime (WebSockets), Storage (for temporary files) │
+│  Row Level Security (RLS)                                   │
+└─────────────────────────────────────────────────────────────┘
+       │ ▲                                 ▲
+       │ │ (AI Processing Request)         │ (AI Results)
+       ▼ ▽                                 │
+┌─────────────────────────────────────────────────────────────┐
+│                        AI SERVICES                          │
+│  OpenAI GPT-4o (Text Generation, Classification)            │
+│  OpenAI Whisper v3 (Speech-to-Text)                         │
+│  Pinecone (Vector DB for context/embeddings)                │
+└─────────────────────────────────────────────────────────────┘
+```
+
+### 1.2 データモデル (Drizzle ORM Schema)
+
+#### 1.2.1 `users` テーブル
+- `id`: UUID (PK, Supabase Auth `auth.users.id` と同期)
+- `email`: TEXT (Unique, Supabase Auth `email` と同期)
+- `full_name`: TEXT (Optional)
+- `avatar_url`: TEXT (Optional)
+- `created_at`: TIMESTAMP (Default: `now()`)
+
+#### 1.2.2 `kanban_boards` テーブル
+- `id`: UUID (PK, Default: `gen_random_uuid()`)
+- `user_id`: UUID (FK to `users.id`, RLS適用)
+- `name`: TEXT (Not Null)
+- `description`: TEXT (Optional)
+- `created_at`: TIMESTAMP (Default: `now()`)
+- `card_count`: INTEGER (Default: 0, Realtimeで更新)
+
+#### 1.2.3 `kanban_cards` テーブル
+- `id`: UUID (PK, Default: `gen_random_uuid()`)
+- `board_id`: UUID (FK to `kanban_boards.id`, Not Null, RLS適用)
+- `title`: TEXT (Not Null)
+- `description`: TEXT (Optional)
+- `status`: ENUM ('todo', 'in-progress', 'done') (Default: 'todo')
+- `priority`: ENUM ('low', 'medium', 'high') (Optional)
+- `due_date`: DATE (Optional)
+- `created_at`: TIMESTAMP (Default: `now()`)
+
+#### 1.2.4 `audit_logs` テーブル (AI処理記録用)
+- `id`: UUID (PK, Default: `gen_random_uuid()`)
+- `user_id`: UUID (FK to `users.id`, Not Null)
+- `event_type`: TEXT ('audio_processed', 'card_classified', 'summary_generated')
+- `payload`: JSONB (AI入力・出力の匿名化されたデータ)
+- `timestamp`: TIMESTAMP (Default: `now()`)
+
+### 1.3 Edge Functions (Vercel/Supabase)
+
+#### 1.3.1 `process-audio` (音声処理)
+- **エンドポイント**: `/functions/v1/process-audio`
+- **メソッド**: `POST`
+- **入力**: `audio` (Blob/File), `boardId` (Optional, for context)
+- **処理**:
+    1. 認証 (JWT検証)
+    2. `audio` を OpenAI Whisper API に転送 (ストリーミング)
+    3. Whisper からテキストを取得
+    4. テキストと `boardId` を OpenAI GPT-4o に転送 (カード分類、要約)
+    5. GPT-4o から `KanbanCardSuggestion` を取得 (タイトル、説明、プロジェクト、優先度、期日)
+    6. `audit_logs` に処理を記録 (匿名化されたデータ)
+    7. `KanbanCardSuggestion` と AIの自信度 (`confidence`) をクライアントに返却
+- **セキュリティ**: 音声データはサーバーに保存せず、処理後即時廃棄。
+
+#### 1.3.2 `create-kanban-card` (AI提案に基づくカード作成)
+- **エンドポイント**: `/functions/v1/create-kanban-card`
+- **メソッド**: `POST`
+- **入力**: `suggestion` (KanbanCardSuggestion), `boardId`
+- **処理**:
+    1. 認証 (JWT検証)
+    2. `suggestion` を元に `kanban_cards` テーブルに新規レコード挿入
+    3. `kanban_boards` の `card_count` をインクリメント
+    4. 成功したカードデータを返却
+
+### 1.4 クライアントサイド状態管理 (Zustand)
+
+#### 1.4.1 `authStore`
+- `session`: `Session | null` (Supabase Authセッション)
+- `setSession`: `(session: Session | null) => void`
+
+#### 1.4.2 `kanbanStore`
+- `boards`: `KanbanBoard[]` (ユーザーの全カンバンボード)
+- `cards`: `Record<string, KanbanCard[]>` (ボードIDごとのカードリスト)
+- `addBoard`: `(board: KanbanBoard) => void`
+- `updateBoard`: `(board: KanbanBoard) => void`
+- `deleteBoard`: `(boardId: string) => void`
+- `addCard`: `(boardId: string, card: KanbanCard) => void`
+- `updateCard`: `(boardId: string, card: KanbanCard) => void`
+- `deleteCard`: `(boardId: string, cardId: string) => void`
+
+### 1.5 クライアントサイドデータフェッチ (TanStack Query)
+
+- `useQuery(['kanbanBoards', userId], fetchKanbanBoards)`
+- `useQuery(['kanbanCards', boardId], () => fetchKanbanCards(boardId))`
+- `useMutation(createKanbanCard)`
+- `useMutation(updateKanbanCard)`
+- `useMutation(deleteKanbanCard)`
+
+---
+
+## 第2章 UI/UXデザイン
+
+### 2.1 全体デザインシステム
+
+- **テーマ**: Minimalist, Productivity-focused
+- **カラーパレット**:
+    - Primary: #007bff (Blue)
+    - Accent: #28a745 (Green)
+    - Warning: #ffc107 (Yellow)
+    - Danger: #dc3545 (Red)
+    - Text: #333, #666, #999
+    - Background: #f8f8f8, #fff
+- **タイポグラフィ**: Sans-serif (システムフォント優先, 例: SF Pro, Roboto)
+- **コンポーネントライブラリ**: shadcn/ui (Web), カスタムReact Nativeコンポーネント (Mobile)
+
+### 2.2 主要画面フロー
+
+#### 2.2.1 認証フロー
+- **サインアップ**: メールアドレス、パスワード → 確認メール → ログイン
+- **サインイン**: メールアドレス、パスワード → ログイン
+- **パスワードリセット**: メールアドレス → リセットメール
+
+#### 2.2.2 ホーム画面 (`/`)
+- ユーザーのカンバンボード一覧を表示
+- 各ボードはカード形式で表示 (`KanbanBoardListItem`)
+- ボード作成ボタン
+- 設定/プロフィールへのナビゲーション
+
+#### 2.2.3 カンバンボード詳細画面 (`/kanban/[boardId]`)
+- 選択されたボードのカード一覧を「Todo」「In Progress」「Done」の列で表示
+- カードはドラッグ＆ドロップで移動可能 (将来的に実装)
+- 音声入力ボタン (`VoiceInputButton`)
+- テキスト入力代替 (`TextInputAlternative`)
+- AI提案モーダル (`AiSuggestionModal`)
+
+#### 2.2.4 設定画面 (`/settings`)
+- ユーザープロフィール表示 (`UserProfile`)
+- 言語切り替え (`LanguageSwitcher`)
+- アカウント管理 (パスワード変更、ログアウト、アカウント削除)
+- 課金情報 (Stripe連携)
+
+### 2.3 コンポーネント仕様
+
+#### 2.3.1 `VoiceInputButton`
+- **機能**: 音声録音の開始/停止、録音中の視覚的フィードバック、AI処理のトリガー
+- **状態**: `idle`, `recording`, `processing`
+- **UI**:
+    - 大きな円形ボタン
+    - `idle`: 青色、マイクアイコン、"録音開始" テキスト
+    - `recording`: 赤色、停止アイコン、"録音停止" テキスト、録音時間表示
+    - `processing`: 青色、ローディングスピナー、"AI処理中..." テキスト
+- **アクセシビリティ**:
+    - `accessibilityLabel` と `accessibilityHint` を設定
+    - 録音状態に応じてボタンのテキストと役割を更新
+
+#### 2.3.2 `AiSuggestionModal`
+- **機能**: AIが生成したカードの提案を表示、ユーザーが内容を編集・確認・キャンセル
+- **UI**:
+    - モーダル形式で表示
+    - 提案されたカードのタイトル、説明、プロジェクト、優先度、期日を編集可能なテキスト入力フィールドで表示
+    - 「確認」ボタンと「キャンセル」ボタン
+    - AIの自信度が低い場合は警告メッセージを表示
+- **アクセシビリティ**:
+    - モーダルが開いた際にフォーカスを適切に管理
+    - 各入力フィールドにラベルとアクセシビリティ情報を付与
+
+#### 2.3.3 `TextInputAlternative`
+- **機能**: 音声入力が困難な場合や、テキストで直接入力したい場合の代替手段
+- **UI**:
+    - マルチライン対応のテキスト入力フィールド
+    - 「カードを作成」ボタン
+- **アクセシビリティ**:
+    - `accessibilityLabel` と `accessibilityHint` を設定
+    - キーボードナビゲーションをサポート
+
+#### 2.3.4 `KanbanBoardListItem`
+- **機能**: ホーム画面で各カンバンボードの概要を表示し、詳細画面へのナビゲーションを提供
+- **UI**:
+    - カード形式の表示
+    - ボード名、説明、作成日、カード数を表示
+- **アクセシビリティ**:
+    - `Link` コンポーネントを使用し、ナビゲーション可能であることを明示
+
+#### 2.3.5 `UserProfile`
+- **機能**: ユーザーのプロフィール情報（アバター、名前、メールアドレス、ユーザーID）を表示
+- **UI**:
+    - アバター画像（またはプレースホルダー）
+    - 表示名、メールアドレス、ユーザーID
+- **アクセシビリティ**:
+    - 画像に `alt` テキスト相当の `accessibilityLabel` を設定
+
+#### 2.3.6 `LanguageSwitcher`
+- **機能**: アプリケーションの表示言語を切り替える
+- **UI**:
+    - 対応言語のリストをボタン形式で表示
+    - 現在選択されている言語をハイライト
+- **アクセシビリティ**:
+    - 各言語ボタンに `accessibilityLabel` を設定
+    - 言語変更時のフィードバックを提供
+
+#### 2.3.7 `Button` (UIコンポーネント)
+- **機能**: 再利用可能なボタンコンポーネント
+- **UI**:
+    - `primary`, `secondary`, `destructive`, `ghost` のバリアント
+    - `default`, `sm`, `lg`, `icon` のサイズ
+    - ローディング状態表示
+- **アクセシビリティ**:
+    - `accessibilityRole="button"` を設定
+    - `accessibilityLabel`, `accessibilityHint` をサポート
+    - `disabled` 状態を適切に反映
+
+#### 2.3.8 `Input` (UIコンポーネント)
+- **機能**: 再利用可能なテキスト入力フィールド
+- **UI**:
+    - `label`, `error` メッセージ表示
+    - プレースホルダー
+- **アクセシビリティ**:
+    - `accessibilityLabel` をサポート
+    - `error` 状態を視覚的に表示し、スクリーンリーダーにも通知
 
 ## Development Instructions
 N/A
@@ -241,3 +478,4 @@ N/A
 - Default language: ja (Japanese)
 - RTL support required for Arabic (ar)
 - Use isRTL flag from i18n module for layout adjustments
+

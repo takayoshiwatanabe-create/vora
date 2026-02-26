@@ -1,11 +1,11 @@
 import { Stack, useRouter, SplashScreen } from "expo-router";
 import { StatusBar } from "expo-status-bar";
 import { SafeAreaProvider } from "react-native-safe-area-context";
-import { isRTL, lang } from "@/i18n"; // Import lang
+import { isRTL } from "@/i18n"; // Import isRTL
 import { I18nManager } from "react-native";
 import { useEffect, useState } from "react";
 import { useAuthStore } from "@/stores/authStore";
-import { useAuth } from "@/src/hooks/useAuth";
+import { useAuth } from "@/hooks/useAuth";
 import { useFonts } from "expo-font";
 import * as Updates from 'expo-updates'; // Import Updates
 

@@ -3,7 +3,7 @@ import { t, isRTL } from "@/i18n";
 import { supabase } from "@/lib/supabase";
 import { useRouter, Stack } from "expo-router";
 import { useAuthStore } from "@/stores/authStore";
-import { VoiceInputButton } from "@/src/components/voice-input-button"; // Import VoiceInputButton
+import { VoiceInputButton } from "@/components/voice-input-button"; // Import VoiceInputButton
 
 export default function HomeScreen(): JSX.Element {
   const router = useRouter();
@@ -24,13 +24,14 @@ export default function HomeScreen(): JSX.Element {
   };
 
   return (
-    <View style={[styles.container, isRTL && styles.rtlContainer]}>
+    <View style={[styles.container, isRTL ? styles.rtlContainer : null]}>
       <Stack.Screen options={{ headerShown: false }} />
-      <Text style={[styles.title, isRTL && styles.rtlText]}>{t("home.title")}</Text>
-      <Text style={[styles.subtitle, isRTL && styles.rtlText]}>{t("home.subtitle")}</Text>
+      <Text style={[styles.title, isRTL ? styles.rtlText : null]}>{t("home.title")}</Text>
+      <Text style={[styles.subtitle, isRTL ? styles.rtlText : null]}>{t("home.subtitle")}</Text>
       <VoiceInputButton onCardCreated={handleCardCreated} /> {/* Integrate VoiceInputButton */}
       <Button title={t("home.signOutButton")} onPress={handleSignOut} />
       <Button title={t("home.goToKanbanBoards")} onPress={() => router.push("/(main)/kanban")} />
+      <Button title={t("settings.title")} onPress={() => router.push("/(main)/settings")} />
     </View>
   );
 }

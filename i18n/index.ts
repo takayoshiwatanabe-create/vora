@@ -3,9 +3,10 @@ import { I18nManager } from "react-native";
 import { I18n } from "i18n-js";
 import { translations } from "./translations";
 
-// Set the locale once at the beginning of your app.
-export const lang = Localization.getLocales()[0]?.languageCode || "ja"; // Default to Japanese
-export const isRTL = Localization.getLocales()[0]?.textDirection === "rtl";
+// Determine the primary language code and text direction
+const primaryLocale = Localization.getLocales()[0];
+export const lang = primaryLocale?.languageCode || "ja"; // Default to Japanese
+export const isRTL = primaryLocale?.textDirection === "rtl";
 
 // Set I18nManager.forceRTL and I18nManager.allowRTL immediately on module load
 // This ensures it's set before any components render, which is crucial for native.
@@ -34,8 +35,3 @@ i18n.defaultLocale = "ja";
 export const t = (key: string, options?: Record<string, unknown>): string => {
   return i18n.t(key, options);
 };
-
-// Export isRTL here as well, as it's defined in this module.
-// This makes it consistently available from @/i18n
-// export { isRTL }; // This line is redundant as it's already exported above.
-

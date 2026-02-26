@@ -8,7 +8,7 @@
     "android": "expo start --android",
     "ios": "expo start --ios",
     "web": "expo start --web",
-    "test": "jest --passWithNoTests",
+    "test": "jest --config jest.config.js --passWithNoTests",
     "type-check": "tsc --noEmit",
     "lint": "eslint ."
   },
@@ -43,9 +43,8 @@
     "eslint-plugin-react": "^7.34.3",
     "eslint-plugin-react-hooks": "^4.6.2",
     "jest": "^29.2.1",
-    "jest-expo": "~51.0.0"
-  },
-  "jest": {
-    "preset": "jest-expo"
+    "jest-expo": "~51.0.0",
+    "@testing-library/react-native": "^12.5.1"
   }
 }
+

@@ -1,7 +1,7 @@
 import React from "react";
 import { View, Text, StyleSheet, FlatList, ActivityIndicator, Button } from "react-native";
-import { useKanbanBoards } from "@/src/hooks/useKanbanBoards"; // Corrected import path
-import { KanbanBoardListItem } from "@/src/components/kanban-board-list-item"; // Corrected import path
+import { useKanbanBoards } from "@/src/hooks/useKanbanBoards";
+import { KanbanBoardListItem } from "@/src/components/kanban-board-list-item";
 import { t, isRTL } from "@/i18n";
 import { Stack, useRouter } from "expo-router";
 import { KanbanBoard } from "@/src/types/kanban";

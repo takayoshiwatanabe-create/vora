@@ -7,9 +7,10 @@ import {
   StyleSheet,
   Alert,
   ActivityIndicator,
+  Platform,
 } from "react-native";
 import { Link, useRouter } from "expo-router";
-import { t, isRTL } from "@/i18n";
+import { t, isRTL, lang } from "@/i18n";
 import { supabase } from "@/lib/supabase";
 import { useAuthStore } from "@/stores/authStore"; // Import Zustand store
 
@@ -25,6 +26,9 @@ export default function SignUpScreen(): JSX.Element {
     const { data, error } = await supabase.auth.signUp({
       email,
       password,
+      options: {
+        emailRedirectTo: Platform.OS === "web" ? window.location.origin : "vora://auth/callback",
+      },
     });
 
     if (error) {
@@ -148,4 +152,5 @@ const styles = StyleSheet.create({
     fontSize: 16,
   },
 });
+
 

@@ -8,7 +8,7 @@ export default function KanbanBoardDetailScreen(): JSX.Element {
   const { boardId } = useLocalSearchParams<{ boardId: string }>();
 
   const handleCardCreated = (cardText: string): void => {
-    console.log(`Card created in board ${boardId} with text:`, cardText);
+    console.log(`Card created in board ${boardId ?? "N/A"} with text:`, cardText);
     // Optionally refresh the board view or show a toast
   };
 
@@ -16,7 +16,7 @@ export default function KanbanBoardDetailScreen(): JSX.Element {
     <View style={[styles.container, isRTL && styles.rtlContainer]}>
       <Stack.Screen options={{ title: t("kanban.boardDetailTitle") }} />
       <Text style={[styles.title, isRTL && styles.rtlText]}>
-        {t("kanban.boardIdDisplay", { id: boardId })}
+        {t("kanban.boardIdDisplay", { id: boardId ?? "N/A" })}
       </Text>
       <Text style={[styles.subtitle, isRTL && styles.rtlText]}>
         {t("kanban.boardDetailPlaceholder")}

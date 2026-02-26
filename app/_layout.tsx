@@ -26,7 +26,7 @@ export default function RootLayout(): JSX.Element {
   useAuth(setSession); // Pass setSession to the hook
 
   useEffect(() => {
-    async function prepare(): Promise<void> { // Changed return type to void
+    async function prepare(): Promise<void> {
       try {
         // Set RTL direction for the entire app
         if (I18nManager.isRTL !== isRTL && lang === "ar") { // Only force RTL if language is Arabic
@@ -71,6 +71,9 @@ export default function RootLayout(): JSX.Element {
       <Stack>
         <Stack.Screen name="(auth)" options={{ headerShown: false }} />
         <Stack.Screen name="(main)" options={{ headerShown: false }} />
+        {/* The root index.tsx is typically for a splash screen or initial redirect logic,
+            but if it's meant to be a standalone screen, it should be handled.
+            Given the current logic, it's likely meant to redirect. */}
         <Stack.Screen name="index" options={{ headerShown: false }} />
         {/* Add a catch-all for unhandled routes or a 404 page */}
         <Stack.Screen name="+not-found" />

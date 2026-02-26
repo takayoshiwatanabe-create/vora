@@ -216,7 +216,165 @@ Enterpriseカスタムモデル = カスタム
 
 ```
 ┌─────────────────────────────────────────────────────────────┐
-│                        CLIENTS
+│                        CLIENTS                              │
+│  (Next.js 15, React 19, TailwindCSS 4, Expo for Mobile)     │
+└─────────────────────────────────────────────────────────────┘
+       │ ▲                                            ▲
+       │ │ API Requests                               │ Realtime Subscriptions
+       ▼ ▽                                            │
+┌─────────────────────────────────────────────────────────────┐
+│                        Edge Functions                       │
+│  (Vercel Edge Runtime, Supabase Edge Functions)             │
+│  - Auth Proxy                                               │
+│  - AI Orchestration (Whisper, GPT-4o, Pinecone)             │
+│    -> Transcribe Audio (Whisper v3)                         │
+│    -> Generate Kanban Card Suggestion (GPT-4o)              │
+│    -> Vector Search (Pinecone) for context                  │
+│  - Image/File Upload (Cloudinary/S3)                        │
+└─────────────────────────────────────────────────────────────┘
+       │ ▲
+       │ │ Database Operations (Drizzle ORM)
+       ▼ ▽
+┌─────────────────────────────────────────────────────────────┐
+│                        Supabase                             │
+│  - PostgreSQL 16 (DB)                                       │
+│    - RLS (Row Level Security)                               │
+│    - Webhooks (for Stripe, AI callbacks)                    │
+│  - Supabase Auth (JWT, OAuth2, Magic Link, MFA)             │
+│  - Supabase Realtime (WebSockets for live updates)          │
+│  - Supabase Storage (for user files, not audio)             │
+└─────────────────────────────────────────────────────────────┘
+       │ ▲
+       │ │ Payment Webhooks & Data Sync
+       ▼ ▽
+┌─────────────────────────────────────────────────────────────┐
+│                        Stripe                               │
+│  (Billing, Usage-based metering, Webhooks)                  │
+└─────────────────────────────────────────────────────────────┘
+```
+
+### 1.2 データモデル (Drizzle ORM Schema)
+
+#### 1.2.1 `users` テーブル
+- `id` (UUID, PK, auth.users.id参照)
+- `email` (TEXT, UNIQUE)
+- `display_name` (TEXT, NULLABLE)
+- `avatar_url` (TEXT, NULLABLE)
+- `created_at` (TIMESTAMP, DEFAULT NOW())
+- `updated_at` (TIMESTAMP, DEFAULT NOW())
+
+#### 1.2.2 `kanban_boards` テーブル
+- `id` (UUID, PK, DEFAULT gen_random_uuid())
+- `user_id` (UUID, FK -> users.id, NOT NULL)
+- `name` (TEXT, NOT NULL)
+- `description` (TEXT, NULLABLE)
+- `created_at` (TIMESTAMP, DEFAULT NOW())
+- `updated_at` (TIMESTAMP, DEFAULT NOW())
+- `card_count` (INTEGER, DEFAULT 0) - RLS適用
+
+#### 1.2.3 `kanban_columns` テーブル
+- `id` (UUID, PK, DEFAULT gen_random_uuid())
+- `board_id` (UUID, FK -> kanban_boards.id, NOT NULL)
+- `user_id` (UUID, FK -> users.id, NOT NULL)
+- `name` (TEXT, NOT NULL)
+- `order` (INTEGER, NOT NULL)
+- `created_at` (TIMESTAMP, DEFAULT NOW())
+- `updated_at` (TIMESTAMP, DEFAULT NOW()) - RLS適用
+
+#### 1.2.4 `kanban_cards` テーブル
+- `id` (UUID, PK, DEFAULT gen_random_uuid())
+- `column_id` (UUID, FK -> kanban_columns.id, NOT NULL)
+- `board_id` (UUID, FK -> kanban_boards.id, NOT NULL)
+- `user_id` (UUID, FK -> users.id, NOT NULL)
+- `title` (TEXT, NOT NULL)
+- `description` (TEXT, NULLABLE)
+- `priority` (TEXT, DEFAULT 'medium') - 'low', 'medium', 'high'
+- `due_date` (DATE, NULLABLE)
+- `order` (INTEGER, NOT NULL)
+- `created_at` (TIMESTAMP, DEFAULT NOW())
+- `updated_at` (TIMESTAMP, DEFAULT NOW()) - RLS適用
+
+#### 1.2.5 `audit_logs` テーブル (AI処理記録用)
+- `id` (UUID, PK, DEFAULT gen_random_uuid())
+- `user_id` (UUID, FK -> users.id, NULLABLE)
+- `event_type` (TEXT, NOT NULL) - 例: 'audio_transcription', 'card_suggestion', 'card_creation'
+- `payload` (JSONB, NULLABLE) - 処理の詳細、AIの応答、入力データなど
+- `created_at` (TIMESTAMP, DEFAULT NOW())
+
+### 1.3 AI処理フロー (音声入力からカード生成まで)
+
+1.  **クライアント (Mobile/Web)**
+    *   ユーザーがマイクボタンを長押しして音声入力開始。
+    *   `useVoiceRecording` フックが録音を管理し、音声データを一時ファイルとして保存。
+    *   ユーザーがボタンを離すと録音停止。
+    *   録音された音声ファイル (`.webm` または `.m4a`) を取得。
+    *   音声ファイルを `processAudioWithAI` (APIクライアント) 経由で Edge Function へ送信。
+
+2.  **Edge Function (`process-audio`)**
+    *   クライアントから受信した音声データ (Blob) を直接 Whisper API (OpenAI) へストリーミング転送。
+    *   **Privacy by Design**: 音声データはEdge Functionに永続保存せず、処理後即時破棄。
+    *   Whisper APIからテキスト (`transcription`) を受信。
+    *   `transcription` と、必要に応じてユーザーの既存のボード/カード情報 (Pinecone Vector DBから取得) をGPT-4oへ送信。
+    *   GPT-4oは以下の構造でカンバンカードの提案を生成:
+        ```typescript
+        export interface KanbanCardSuggestion {
+          cardText: string;
+          project: string | null;
+          priority: "low" | "medium" | "high" | null;
+          dueDate: string | null; // YYYY-MM-DD format
+          confidence: number; // AIの提案に対する自信度 (0.0 - 1.0)
+        }
+        ```
+    *   AIの `confidence` が閾値 (例: 0.8) 未満の場合、または特定のキーワード (例: "確認") が含まれる場合、提案をユーザーに提示して確認を求める。
+    *   `audit_logs` テーブルにAI処理の記録を保存。
+    *   生成された `KanbanCardSuggestion` をクライアントに返却。
+
+3.  **クライアント (Mobile/Web)**
+    *   `processAudioWithAI` から `KanbanCardSuggestion` を受信。
+    *   **AI Confidence First**: `confidence` が低い、またはユーザー確認が必要な場合、`AiSuggestionModal` を表示してユーザーに提案内容の確認・編集を促す。
+    *   ユーザーが提案を承認または編集後、`createKanbanCard` (APIクライアント) を呼び出し、Supabase DBにカードを永続化。
+    *   `AiSuggestionModal` は、カードテキスト、プロジェクト、優先度、期日などのフィールドを編集可能にする。
+
+### 1.4 UI/UXフロー (音声入力)
+
+1.  **メイン画面/ボード詳細画面**
+    *   画面下部に常に表示されるマイクボタン (`VoiceInputButton`)。
+    *   ボタンは録音中は赤色、アイドル時は青色。
+    *   録音中はボタン中央に「録音中...」またはタイマーが表示される。
+    *   処理中は「処理中...」と表示され、ActivityIndicatorが回転。
+
+2.  **AI提案確認モーダル (`AiSuggestionModal`)**
+    *   AIがカード提案を生成後、自動的に表示される。
+    *   タイトル: 「AIの提案を確認」
+    *   表示内容:
+        *   カードテキスト (編集可能なTextInput)
+        *   プロジェクト名 (編集可能なTextInput, 任意)
+        *   優先度 (編集可能なTextInput, 任意)
+        *   期日 (編集可能なTextInput, 任意, YYYY-MM-DD形式)
+    *   アクションボタン:
+        *   「キャンセル」: モーダルを閉じ、カード作成を破棄。
+        *   「確認して作成」: 編集内容でカードをDBに作成。
+    *   ローディング状態: 提案取得中はActivityIndicatorと「処理中...」メッセージ。
+    *   エラー状態: エラーメッセージと「閉じる」ボタン。
+
+### 1.5 認証フロー
+
+-   **サインイン/サインアップ画面 (`app/(auth)/sign-in.tsx`, `app/(auth)/sign-up.tsx`)**
+    *   メール/パスワード認証
+    *   マジックリンク認証
+    *   Google/Apple OAuth2認証 (Expo Auth Sessionを使用)
+-   **セッション管理**
+    *   `useAuthStore` (Zustand) でセッション状態を管理。
+    *   `useAuth` フックでSupabaseの`onAuthStateChange`を購読し、Zustandストアを更新。
+    *   `AsyncStorage` を使用してセッションを永続化。
+
+### 1.6 Kanbanボード表示
+
+-   **ボード一覧画面 (`app/(main)/boards.tsx`)**
+    *   `useKanbanBoards` フックでユーザーのボード一覧を取得。
+    *   `KanbanBoardListItem` コンポーネントで各ボードを表示。
+    *   ボード名、説明、カード数、作成日を表示。
+    *   各アイテムは `expo-router` の `Link` でボード詳細画面へ遷移。
 
 ## Development Instructions
 N/A
@@ -241,5 +399,3 @@ N/A
 - Default language: ja (Japanese)
 - RTL support required for Arabic (ar)
 - Use isRTL flag from i18n module for layout adjustments
-
-

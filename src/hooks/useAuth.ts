@@ -16,7 +16,7 @@ export function useAuth(setSessionStore: (session: Session | null) => void): voi
     );
 
     // Fetch initial session on mount
-    void supabase.auth.getSession().then(({ data: { session } }) => {
+    supabase.auth.getSession().then(({ data: { session } }) => {
       setSessionStore(session);
     });
 

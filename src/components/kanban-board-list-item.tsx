@@ -1,7 +1,7 @@
 import React from "react";
 import { View, Text, StyleSheet, TouchableOpacity } from "react-native";
 import { Link } from "expo-router"; // Use Link from expo-router for navigation
-import { KanbanBoard } from "@/src/types/kanban";
+import { KanbanBoard } from "@/types/kanban";
 import { t, isRTL, lang } from "@/i18n"; // Import lang for locale
 
 interface KanbanBoardListItemProps {

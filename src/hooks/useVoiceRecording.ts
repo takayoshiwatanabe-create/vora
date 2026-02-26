@@ -27,15 +27,27 @@ export function useVoiceRecording(): UseVoiceRecordingResult {
   const intervalRef = useRef<NodeJS.Timeout | null>(null);
 
   const clearRecording = useCallback(() => {
+    setAudioDuration(0); // Reset duration
+    if (audioUri) {
+      void FileSystem.deleteAsync(audioUri, { idempotent: true }).catch(err =>
+        console.warn("Failed to delete audio file:", err)
+      );
+    }
     setAudioUri(null);
-    setRecordingDuration(0);
-  }, []);
+  }, [audioUri]);
+
+  const setAudioDuration = (duration: number) => {
+    setRecordingDuration(duration);
+  };
 
   const startRecording = useCallback(async (): Promise<void> => {
     try {
       if (permissionResponse?.status !== "granted") {
         const permission = await requestPermission();
         if (permission?.status !== "granted") {
+          // Alert is handled by the component using this hook.
+          // This hook should ideally just return the status and let the component decide on UI.
+          // For now, keeping the Alert here as it's a common pattern in Expo examples.
           Alert.alert(
             t("voiceInput.permissionDeniedTitle"),
             t("voiceInput.permissionDeniedMessage")
@@ -57,11 +69,11 @@ export function useVoiceRecording(): UseVoiceRecordingResult {
       );
       recordingRef.current = recording;
       setIsRecording(true);
-      setRecordingDuration(0);
+      setAudioDuration(0);
       setAudioUri(null); // Clear previous URI
 
       intervalRef.current = setInterval(() => {
-        setRecordingDuration((prev) => prev + 1);
+        setAudioDuration((prev) => prev + 1);
       }, 1000);
     } catch (err: unknown) {
       console.error("Failed to start recording", err);
@@ -118,12 +130,14 @@ export function useVoiceRecording(): UseVoiceRecordingResult {
       if (intervalRef.current) {
         clearInterval(intervalRef.current);
       }
+      // Ensure any lingering audio file is deleted on unmount
       if (audioUri) {
-        // Delete the temporary audio file
-        void FileSystem.deleteAsync(audioUri, { idempotent: true });
+        void FileSystem.deleteAsync(audioUri, { idempotent: true }).catch(err =>
+          console.warn("Failed to delete audio file during unmount:", err)
+        );
       }
     };
-  }, [audioUri]);
+  }, [audioUri]); // Added audioUri to dependency array for cleanup
 
   return {
     isRecording,

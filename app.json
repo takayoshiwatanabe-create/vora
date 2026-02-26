@@ -4,15 +4,17 @@
     "slug": "vora",
     "version": "1.0.0",
     "orientation": "portrait",
-    "icon": "./assets/icon.png",
+    "icon": "./assets/app_icon.png",
     "scheme": "vora",
     "userInterfaceStyle": "automatic",
     "newArchEnabled": true,
     "ios": {
       "supportsTablet": false,
       "bundleIdentifier": "com.zerocode.vora",
+      "buildNumber": "1.0.0",
       "infoPlist": {
-        "NSMicrophoneUsageDescription": "Vora needs access to your microphone to record voice input for creating kanban cards."
+        "NSMicrophoneUsageDescription": "Vora needs access to your microphone to record voice input for creating kanban cards.",
+        "NSLocationWhenInUseUsageDescription": "Vora does not use your location, but this permission might be requested by underlying system components. We do not collect or store any location data."
       }
     },
     "android": {
@@ -22,7 +24,9 @@
       },
       "package": "com.zerocode.vora",
       "permissions": [
-        "android.permission.RECORD_AUDIO"
+        "android.permission.RECORD_AUDIO",
+        "android.permission.ACCESS_FINE_LOCATION",
+        "android.permission.ACCESS_COARSE_LOCATION"
       ]
     },
     "web": {
@@ -42,6 +46,12 @@
       },
       "supabaseUrl": "YOUR_SUPABASE_URL",
       "supabaseAnonKey": "YOUR_SUPABASE_ANON_KEY"
-    }
+    },
+    "splash": {
+      "image": "./assets/splash.png",
+      "backgroundColor": "#FFFBEB"
+    },
+    "description": "Voraは、あなたの思考を瞬時に整理し、生産性を最大化する次世代のカンバンアプリです。音声入力だけでタスクやアイデアをカード化し、AIが自動で分類・整理。手動での入力やドラッグ＆ドロップの煩わしさから解放され、本当に集中すべき仕事に時間を使えます。日本語・英語を含む多言語対応、オフライン動作、プライバシー保護を最優先に設計されています。あなたの「声」が、未来のワークフローを創ります。",
+    "privacyPolicyUrl": "https://www.vora.com/privacy"
   }
 }

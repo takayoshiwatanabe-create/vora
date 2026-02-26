@@ -16,6 +16,7 @@ import { supabase } from "@/lib/supabase";
 import { useAuthStore } from "@/stores/authStore";
 import { I18nManager } from "react-native";
 import * as Updates from 'expo-updates'; // Import Updates
+import * as Linking from 'expo-linking'; // Import Linking for privacy policy URL
 
 export default function SettingsScreen(): JSX.Element {
   const router = useRouter();
@@ -117,6 +118,31 @@ export default function SettingsScreen(): JSX.Element {
     router.replace("/(auth)/sign-in");
   };
 
+  const handlePrivacyPolicyPress = (): void => {
+    // This URL should be configured in app.json or a constants file
+    const privacyPolicyUrl = "https://www.vora.com/privacy"; // Example URL
+    void Linking.openURL(privacyPolicyUrl);
+  };
+
+  const handleBillingPress = (): void => {
+    Alert.alert(
+      t("settings.billingInfoTitle"),
+      t("settings.billingInfoMessage"),
+      [
+        {
+          text: t("common.ok"),
+          onPress: () => {
+            // For digital content sales, use StoreKit/IAP (In-App Purchases)
+            // Do NOT link directly to external payment websites.
+            // Example: Implement a native module or use a library like `expo-in-app-purchases`
+            // to handle subscriptions or one-time purchases.
+            console.log("Navigate to in-app purchase flow or subscription management.");
+          },
+        },
+      ]
+    );
+  };
+
   return (
     <ScrollView
       style={[styles.container, isRTL ? styles.rtlContainer : null]}
@@ -193,12 +219,29 @@ export default function SettingsScreen(): JSX.Element {
       <Text style={[styles.sectionTitle, isRTL ? styles.rtlText : null]}>
         {t("settings.privacySection")}
       </Text>
-      <Text style={[styles.privacyText, isRTL ? styles.rtlText : null]}>
-        {t("settings.privacyPolicyText")}
-      </Text>
+      <TouchableOpacity
+        style={[styles.settingItem, isRTL ? styles.rtlSettingItem : null]}
+        onPress={handlePrivacyPolicyPress}
+      >
+        <Text style={[styles.settingLabel, isRTL ? styles.rtlText : null]}>
+          {t("settings.privacyPolicy")}
+        </Text>
+      </TouchableOpacity>
       <Text style={[styles.privacyText, isRTL ? styles.rtlText : null]}>
         {t("settings.voiceDataPolicy")}
       </Text>
+
+      <Text style={[styles.sectionTitle, isRTL ? styles.rtlText : null]}>
+        {t("settings.billingSection")}
+      </Text>
+      <TouchableOpacity
+        style={[styles.settingItem, isRTL ? styles.rtlSettingItem : null]}
+        onPress={handleBillingPress}
+      >
+        <Text style={[styles.settingLabel, isRTL ? styles.rtlText : null]}>
+          {t("settings.billingInfo")}
+        </Text>
+      </TouchableOpacity>
 
       <TouchableOpacity style={styles.signOutButton} onPress={handleSignOut}>
         <Text style={styles.signOutButtonText}>
@@ -307,4 +350,3 @@ const styles = StyleSheet.create({
     textAlign: "right",
   },
 });
-

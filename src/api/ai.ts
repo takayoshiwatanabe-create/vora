@@ -18,7 +18,8 @@ export async function processAudioWithAI(
   audioBlob: Blob,
   boardId?: string
 ): Promise<AiProcessAudioResponse> {
-  const token = (await supabase.auth.getSession()).data.session?.access_token;
+  const session = (await supabase.auth.getSession()).data.session;
+  const token = session?.access_token;
 
   if (!token) {
     throw new Error(t("auth.notAuthenticated"));
@@ -44,7 +45,7 @@ export async function processAudioWithAI(
     );
 
     if (!response.ok) {
-      const errorData = await response.json() as { message?: string };
+      const errorData = (await response.json()) as { message?: string };
       throw new Error(
         errorData.message || t("api.ai.edgeFunctionError")
       );

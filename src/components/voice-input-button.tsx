@@ -4,146 +4,211 @@ import {
   Text,
   TouchableOpacity,
   StyleSheet,
-  ActivityIndicator,
   Alert,
+  ActivityIndicator,
 } from "react-native";
+import { Audio } from "expo-av";
+import * as FileSystem from "expo-file-system";
 import { t, isRTL } from "@/i18n";
 import { useAuthStore } from "@/stores/authStore";
+import { KanbanCardSuggestion, KanbanCard } from "@/types/kanban";
 import { processAudioWithAI } from "@/api/ai";
+import { AiSuggestionModal } from "./ai-suggestion-modal";
 import { createKanbanCard } from "@/api/kanban";
-import { AiSuggestionModal } from "@/components/ai-suggestion-modal";
-import { KanbanCardSuggestion } from "@/types/kanban";
-import { useVoiceRecording } from "@/hooks/useVoiceRecording"; // Import the custom hook
+import { addOfflineKanbanChange } from "@/lib/offlineManager";
+import { useNetInfo } from "@react-native-community/netinfo";
+import { useQueryClient } from "@tanstack/react-query"; // Import useQueryClient
 
 interface VoiceInputButtonProps {
-  boardId?: string; // Optional boardId for creating cards in a specific board
-  onCardCreated: (cardText: string) => void;
+  boardId?: string; // Optional board ID for context
+  onCardCreated: (cardText: string) => void; // Simplified to just cardText, actual card creation handled internally
 }
 
 export function VoiceInputButton({
   boardId,
   onCardCreated,
 }: VoiceInputButtonProps): JSX.Element {
-  const {
-    isRecording,
-    recordingDuration,
-    audioUri,
-    startRecording,
-    stopRecording,
-    clearRecording,
-    requestPermission, // Added from hook
-    permissionResponse, // Added from hook
-  } = useVoiceRecording();
-
+  const [recording, setRecording] = useState<Audio.Recording | undefined>(
+    undefined
+  );
+  const [isRecording, setIsRecording] = useState<boolean>(false);
   const [isProcessing, setIsProcessing] = useState<boolean>(false);
-  const [suggestionModalVisible, setSuggestionModalVisible] =
-    useState<boolean>(false);
-  const [aiSuggestion, setAiSuggestion] =
-    useState<KanbanCardSuggestion | null>(null);
+  const [modalVisible, setModalVisible] = useState<boolean>(false);
+  const [aiSuggestion, setAiSuggestion] = useState<KanbanCardSuggestion | null>(
+    null
+  );
   const [aiError, setAiError] = useState<string | null>(null);
-
   const session = useAuthStore((state) => state.session);
+  const netInfo = useNetInfo();
+  const queryClient = useQueryClient(); // Initialize query client
 
   useEffect(() => {
-    // Request microphone permission on component mount
-    void requestPermission();
-  }, [requestPermission]);
+    void Audio.requestPermissionsAsync();
+  }, []);
 
-  useEffect(() => {
-    const handleAudioProcessing = async (): Promise<void> => {
-      if (audioUri) {
-        setIsProcessing(true);
-        setAiError(null);
-        setAiSuggestion(null);
-
-        if (!session?.access_token || !session?.user?.id) {
-          Alert.alert(t("common.error"), t("auth.notAuthenticated"));
-          setIsProcessing(false);
-          clearRecording();
-          return;
-        }
-
-        try {
-          // Convert audioUri to Blob for fetch API
-          const response = await fetch(audioUri);
-          const audioBlob = await response.blob();
-
-          const aiResponse = await processAudioWithAI(audioBlob, boardId);
-
-          if (aiResponse.suggestion) {
-            setAiSuggestion(aiResponse.suggestion);
-            // AI Confidence First: If confidence is low or specific conditions, show modal
-            // The spec states: "AIが自信を持てる時のみ自動実行。不確かな時はユーザーへ確認"
-            // For now, we always show the modal for user confirmation, assuming the AI might be uncertain
-            // or the user might want to refine the suggestion.
-            setSuggestionModalVisible(true);
-          } else {
-            // If AI returns no suggestion, show an error message.
-            setAiError(aiResponse.message || t("api.ai.noCardReturned"));
-            setSuggestionModalVisible(true); // Show modal with error message
-          }
-        } catch (err: unknown) {
-          console.error("Error processing audio:", err);
-          setAiError(
-            (err instanceof Error) ? err.message : t("voiceInput.processingError")
-          );
-          setSuggestionModalVisible(true); // Show modal with error message
-        } finally {
-          setIsProcessing(false);
-          clearRecording(); // Clear the temporary audio file after processing
-        }
-      }
-    };
-
-    void handleAudioProcessing();
-  }, [audioUri, session, boardId, clearRecording]);
-
-  const handleConfirmSuggestion = async (
-    confirmedSuggestion: KanbanCardSuggestion
-  ): Promise<void> => {
-    if (!session?.user?.id) {
-      Alert.alert(t("common.error"), t("auth.notAuthenticated"));
-      return;
-    }
-    if (!boardId) {
-      Alert.alert(t("common.error"), t("kanban.noBoardSelected")); // New translation key needed
-      return;
-    }
-
-    setSuggestionModalVisible(false);
-    setIsProcessing(true); // Indicate that card creation is in progress
-
+  const startRecording = async (): Promise<void> => {
     try {
-      const { data, error } = await createKanbanCard(
-        confirmedSuggestion,
-        boardId,
-        session.user.id
-      );
+      if (isProcessing) return;
 
-      if (error) {
-        Alert.alert(t("common.error"), error.message);
-      } else if (data) {
+      const permission = await Audio.requestPermissionsAsync();
+      if (permission.status !== "granted") {
         Alert.alert(
-          t("voiceInput.successTitle"),
-          t("voiceInput.successMessage", { text: data.title })
+          t("voiceInput.permissionDeniedTitle"),
+          t("voiceInput.permissionDeniedMessage")
         );
-        onCardCreated(data.title);
+        return;
       }
-    } catch (err: unknown) {
-      console.error("Error creating card:", err);
-      Alert.alert(
-        t("common.error"),
-        (err instanceof Error) ? err.message : t("common.unknownError")
+
+      await Audio.setAudioModeAsync({
+        allowsRecordingIOS: true,
+        playsInSilentModeIOS: true,
+      });
+
+      const newRecording = new Audio.Recording();
+      await newRecording.prepareToRecordAsync(
+        Audio.RecordingOptionsPresets.HIGH_QUALITY
       );
-    } finally {
+      await newRecording.startAsync();
+      setRecording(newRecording);
+      setIsRecording(true);
       setIsProcessing(false);
-      setAiSuggestion(null); // Clear suggestion after action
-      setAiError(null); // Clear any previous error
+      setAiError(null);
+      setAiSuggestion(null);
+    } catch (err: unknown) {
+      console.error("Failed to start recording", err);
+      Alert.alert(t("voiceInput.errorTitle"), t("voiceInput.startRecordingError"));
+      setIsRecording(false);
+      setIsProcessing(false);
     }
   };
 
-  const handleCancelSuggestion = (): void => {
-    setSuggestionModalVisible(false);
+  const stopRecording = async (): Promise<void> => {
+    if (!recording) {
+      return;
+    }
+
+    setIsRecording(false);
+    setIsProcessing(true);
+    try {
+      await recording.stopAndUnloadAsync();
+      await Audio.setAudioModeAsync({
+        allowsRecordingIOS: false,
+        playsInSilentModeIOS: true,
+      });
+
+      const uri = recording.getURI();
+      if (!uri) {
+        Alert.alert(t("voiceInput.errorTitle"), t("voiceInput.noTextFound"));
+        setIsProcessing(false);
+        setRecording(undefined);
+        return;
+      }
+
+      const audioBlob = await (await fetch(uri)).blob();
+      await processAudio(audioBlob);
+    } catch (err: unknown) {
+      console.error("Failed to stop recording", err);
+      Alert.alert(t("voiceInput.errorTitle"), t("voiceInput.stopRecordingError"));
+    } finally {
+      setRecording(undefined);
+      setIsProcessing(false);
+    }
+  };
+
+  const processAudio = async (audioBlob: Blob): Promise<void> => {
+    if (!session?.access_token) {
+      Alert.alert(t("common.error"), t("auth.notAuthenticated"));
+      setIsProcessing(false);
+      return;
+    }
+
+    try {
+      setModalVisible(true);
+      setAiError(null);
+      setAiSuggestion(null);
+
+      const result = await processAudioWithAI(audioBlob, boardId);
+
+      if (result.suggestion) {
+        setAiSuggestion(result.suggestion);
+      } else {
+        setAiError(result.message || t("api.ai.noCardReturned"));
+      }
+    } catch (err: unknown) {
+      console.error("Error processing audio:", err);
+      setAiError((err as Error).message || t("voiceInput.processingError"));
+    } finally {
+      setIsProcessing(false);
+    }
+  };
+
+  const handleConfirm = async (confirmedSuggestion: KanbanCardSuggestion) => {
+    if (!boardId || !session?.user?.id) {
+      Alert.alert(t("common.error"), t("kanban.noBoardSelectedOrAuth"));
+      setModalVisible(false);
+      return;
+    }
+
+    setModalVisible(false);
+    setIsProcessing(true);
+
+    try {
+      if (netInfo.isConnected) {
+        const { data, error } = await createKanbanCard(
+          confirmedSuggestion,
+          boardId,
+          session.user.id
+        );
+
+        if (error) {
+          throw new Error(error.message);
+        }
+
+        if (data) {
+          Alert.alert(
+            t("voiceInput.successTitle"),
+            t("voiceInput.successMessage", { text: data.title })
+          );
+          onCardCreated(data.title);
+          void queryClient.invalidateQueries({ queryKey: ["kanbanCards", boardId] }); // Invalidate cards query
+          void queryClient.invalidateQueries({ queryKey: ["kanbanBoards", session.user.id] }); // Invalidate boards query to update card_count
+        }
+      } else {
+        const tempCard: KanbanCard = {
+          id: `temp-${Date.now()}`, // Temporary ID for offline card
+          created_at: new Date().toISOString(),
+          updated_at: new Date().toISOString(),
+          user_id: session.user.id,
+          board_id: boardId,
+          column_id: "temp-column", // Placeholder, will be resolved on sync
+          title: confirmedSuggestion.cardText,
+          description: confirmedSuggestion.project ? `Project: ${confirmedSuggestion.project}` : null,
+          priority: confirmedSuggestion.priority || "medium",
+          due_date: confirmedSuggestion.dueDate,
+          order: 0,
+        };
+        addOfflineKanbanChange(boardId, "insert", tempCard);
+        Alert.alert(
+          t("voiceInput.offlineSuccessTitle"),
+          t("voiceInput.offlineSuccessMessage", { text: confirmedSuggestion.cardText })
+        );
+        onCardCreated(confirmedSuggestion.cardText);
+        // No need to invalidate queries for offline changes, offlineManager handles it on sync.
+      }
+    } catch (error: unknown) {
+      console.error("Error creating Kanban card:", error);
+      Alert.alert(
+        t("voiceInput.errorTitle"),
+        (error as Error).message || t("voiceInput.cardCreationError")
+      );
+    } finally {
+      setIsProcessing(false);
+      setAiSuggestion(null);
+    }
+  };
+
+  const handleCancel = () => {
+    setModalVisible(false);
     setAiSuggestion(null);
     setAiError(null);
   };
@@ -151,21 +216,10 @@ export function VoiceInputButton({
   const handleEditSuggestion = (
     field: keyof KanbanCardSuggestion,
     value: string
-  ): void => {
-    setAiSuggestion((prev) =>
-      prev ? { ...prev, [field]: value } : prev
-    );
-  };
-
-  const handleStartRecording = async (): Promise<void> => {
-    if (permissionResponse?.status !== "granted") {
-      Alert.alert(
-        t("voiceInput.permissionDeniedTitle"),
-        t("voiceInput.permissionDeniedMessage")
-      );
-      return;
+  ) => {
+    if (aiSuggestion) {
+      setAiSuggestion({ ...aiSuggestion, [field]: value });
     }
-    await startRecording();
   };
 
   return (
@@ -175,10 +229,10 @@ export function VoiceInputButton({
           styles.button,
           isRecording ? styles.buttonRecording : styles.buttonIdle,
         ]}
-        onPress={isRecording ? void stopRecording : void handleStartRecording}
-        disabled={isProcessing || suggestionModalVisible}
+        onPress={isRecording ? stopRecording : startRecording}
+        disabled={isProcessing || modalVisible}
       >
-        {isProcessing ? (
+        {isProcessing && !modalVisible ? (
           <ActivityIndicator color="#fff" size="small" />
         ) : (
           <Text style={styles.buttonText}>
@@ -188,24 +242,19 @@ export function VoiceInputButton({
           </Text>
         )}
       </TouchableOpacity>
-      {isRecording && (
-        <Text style={[styles.recordingDuration, isRTL && styles.rtlText]}>
-          {recordingDuration}s
-        </Text>
-      )}
-      {isProcessing && (
+      {isProcessing && !modalVisible && (
         <Text style={[styles.processingText, isRTL && styles.rtlText]}>
           {t("voiceInput.processingAudio")}
         </Text>
       )}
 
       <AiSuggestionModal
-        isVisible={suggestionModalVisible}
+        isVisible={modalVisible}
         suggestion={aiSuggestion}
-        loading={isProcessing} // Use isProcessing for modal's loading state
+        loading={isProcessing && !aiSuggestion && !aiError}
         error={aiError}
-        onConfirm={handleConfirmSuggestion}
-        onCancel={handleCancelSuggestion}
+        onConfirm={handleConfirm}
+        onCancel={handleCancel}
         onEdit={handleEditSuggestion}
       />
     </View>
@@ -215,15 +264,16 @@ export function VoiceInputButton({
 const styles = StyleSheet.create({
   container: {
     alignItems: "center",
-    marginVertical: 20,
+    marginTop: 20,
+    marginBottom: 20,
   },
   rtlContainer: {
     // Specific RTL layout adjustments if needed
   },
   button: {
-    width: 150,
-    height: 150,
-    borderRadius: 75,
+    width: 180,
+    height: 60,
+    borderRadius: 30,
     justifyContent: "center",
     alignItems: "center",
     shadowColor: "#000",
@@ -242,11 +292,6 @@ const styles = StyleSheet.create({
     color: "#fff",
     fontSize: 18,
     fontWeight: "bold",
-  },
-  recordingDuration: {
-    marginTop: 10,
-    fontSize: 16,
-    color: "#666",
   },
   processingText: {
     marginTop: 10,

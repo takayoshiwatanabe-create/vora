@@ -83,4 +83,49 @@ export async function createKanbanCard(
 
   return { data: data as KanbanCard, error: null };
 }
-// Other CRUD operations for boards, columns, cards will be added here later.
+
+/**
+ * Updates an existing Kanban card.
+ * @param cardId The ID of the card to update.
+ * @param updates The partial KanbanCard object with fields to update.
+ * @returns A promise that resolves to the updated Kanban card or an error.
+ */
+export async function updateKanbanCard(
+  cardId: string,
+  updates: Partial<KanbanCard>
+): Promise<{ data: KanbanCard | null; error: PostgrestError | null }> {
+  const { data, error } = await supabase
+    .from("kanban_cards")
+    .update(updates)
+    .eq("id", cardId)
+    .select()
+    .single();
+
+  if (error) {
+    console.error("Error updating Kanban card:", error.message);
+    return { data: null, error };
+  }
+
+  return { data: data as KanbanCard, error: null };
+}
+
+/**
+ * Deletes a Kanban card.
+ * @param cardId The ID of the card to delete.
+ * @returns A promise that resolves to true on success or an error.
+ */
+export async function deleteKanbanCard(
+  cardId: string
+): Promise<{ success: boolean; error: PostgrestError | null }> {
+  const { error } = await supabase
+    .from("kanban_cards")
+    .delete()
+    .eq("id", cardId);
+
+  if (error) {
+    console.error("Error deleting Kanban card:", error.message);
+    return { success: false, error };
+  }
+
+  return { success: true, error: null };
+}

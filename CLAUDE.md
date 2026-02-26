@@ -216,165 +216,129 @@ Enterpriseカスタムモデル = カスタム
 
 ```
 ┌─────────────────────────────────────────────────────────────┐
-│                        CLIENTS                              │
-│  (Next.js 15, React 19, TailwindCSS 4, Expo for Mobile)     │
-└─────────────────────────────────────────────────────────────┘
-       │ ▲                                            ▲
-       │ │ API Requests                               │ Realtime Subscriptions
-       ▼ ▽                                            │
-┌─────────────────────────────────────────────────────────────┐
-│                        Edge Functions                       │
-│  (Vercel Edge Runtime, Supabase Edge Functions)             │
-│  - Auth Proxy                                               │
-│  - AI Orchestration (Whisper, GPT-4o, Pinecone)             │
-│    -> Transcribe Audio (Whisper v3)                         │
-│    -> Generate Kanban Card Suggestion (GPT-4o)              │
-│    -> Vector Search (Pinecone) for context                  │
-│  - Image/File Upload (Cloudinary/S3)                        │
-└─────────────────────────────────────────────────────────────┘
-       │ ▲
-       │ │ Database Operations (Drizzle ORM)
-       ▼ ▽
-┌─────────────────────────────────────────────────────────────┐
-│                        Supabase                             │
-│  - PostgreSQL 16 (DB)                                       │
-│    - RLS (Row Level Security)                               │
-│    - Webhooks (for Stripe, AI callbacks)                    │
-│  - Supabase Auth (JWT, OAuth2, Magic Link, MFA)             │
-│  - Supabase Realtime (WebSockets for live updates)          │
-│  - Supabase Storage (for user files, not audio)             │
-└─────────────────────────────────────────────────────────────┘
-       │ ▲
-       │ │ Payment Webhooks & Data Sync
-       ▼ ▽
-┌─────────────────────────────────────────────────────────────┐
-│                        Stripe                               │
-│  (Billing, Usage-based metering, Webhooks)                  │
+│                        CLIENTS
+│ (Web/Mobile)                                                │
+│                                                             │
+│ ┌───────────────────┐     ┌───────────────────────────┐     │
+│ │  Next.js/Expo     │     │  Supabase Client SDK      │     │
+│ │  (React 19)       │     │  (Auth, Realtime, Storage)│     │
+│ └─────────┬─────────┘     └───────────┬───────────────┘     │
+│           │                             │                     │
+│           │ HTTP/WS                     │                     │
+│           ▼                             ▼                     │
+│ ┌─────────────────────────────────────────────────────────────┐
+│ │                     Vercel Edge Network                     │
+│ └───────────────────┬───────────┬───────────┬────────────────┘
+│                     │           │           │
+│                     │ API Routes│ Edge Fns  │
+│                     ▼           ▼           ▼
+│ ┌───────────────────┐ ┌───────────────────┐ ┌───────────────────┐
+│ │  Next.js API      │ │  Supabase Edge    │ │  OpenAI API       │
+│ │  (Auth, Proxy)    │ │  Functions        │ │  (GPT-4o, Whisper)│
+│ └─────────┬─────────┘ └─────────┬─────────┘ └─────────┬─────────┘
+│           │                     │                     │
+│           │                     │                     │
+│           ▼                     ▼                     ▼
+│ ┌───────────────────┐ ┌───────────────────┐ ┌───────────────────┐
+│ │  Supabase         │ │  Supabase         │ │  Pinecone         │
+│ │  (Auth, DB, RLS)  │ │  (Realtime, Storage)│ │  (Vector DB)      │
+│ └───────────────────┘ └───────────────────┘ └───────────────────┘
+│                                                             │
 └─────────────────────────────────────────────────────────────┘
 ```
 
-### 1.2 データモデル (Drizzle ORM Schema)
+### 1.2 データフロー (音声入力からカード生成まで)
 
-#### 1.2.1 `users` テーブル
-- `id` (UUID, PK, auth.users.id参照)
-- `email` (TEXT, UNIQUE)
-- `display_name` (TEXT, NULLABLE)
-- `avatar_url` (TEXT, NULLABLE)
-- `created_at` (TIMESTAMP, DEFAULT NOW())
-- `updated_at` (TIMESTAMP, DEFAULT NOW())
+1.  **ユーザー音声入力**:
+    *   クライアント (Next.js/Expo) のマイクから音声を録音。
+    *   `expo-av` を使用し、`.webm` 形式で一時ファイルとして保存。
+    *   録音データはクライアント側でBase64エンコードされる。
 
-#### 1.2.2 `kanban_boards` テーブル
-- `id` (UUID, PK, DEFAULT gen_random_uuid())
-- `user_id` (UUID, FK -> users.id, NOT NULL)
-- `name` (TEXT, NOT NULL)
-- `description` (TEXT, NULLABLE)
-- `created_at` (TIMESTAMP, DEFAULT NOW())
-- `updated_at` (TIMESTAMP, DEFAULT NOW())
-- `card_count` (INTEGER, DEFAULT 0) - RLS適用
+2.  **Edge Functionへの送信**:
+    *   エンコードされた音声データは、認証情報 (Supabase JWT) と共にSupabase Edge Function (`/functions/v1/process-audio`) へ `multipart/form-data` で送信。
+    *   **Privacy by Design**: 音声データはサーバーに永続保存されない。Edge Functionで処理後、即時破棄。
 
-#### 1.2.3 `kanban_columns` テーブル
-- `id` (UUID, PK, DEFAULT gen_random_uuid())
-- `board_id` (UUID, FK -> kanban_boards.id, NOT NULL)
-- `user_id` (UUID, FK -> users.id, NOT NULL)
-- `name` (TEXT, NOT NULL)
-- `order` (INTEGER, NOT NULL)
-- `created_at` (TIMESTAMP, DEFAULT NOW())
-- `updated_at` (TIMESTAMP, DEFAULT NOW()) - RLS適用
+3.  **Whisper APIによる文字起こし**:
+    *   Edge Functionは受信した音声データを直接OpenAI Whisper API (v3) へストリーミング転送。
+    *   Whisper APIは音声をテキストに変換し、Edge Functionへ返却。
 
-#### 1.2.4 `kanban_cards` テーブル
-- `id` (UUID, PK, DEFAULT gen_random_uuid())
-- `column_id` (UUID, FK -> kanban_columns.id, NOT NULL)
-- `board_id` (UUID, FK -> kanban_boards.id, NOT NULL)
-- `user_id` (UUID, FK -> users.id, NOT NULL)
-- `title` (TEXT, NOT NULL)
-- `description` (TEXT, NULLABLE)
-- `priority` (TEXT, DEFAULT 'medium') - 'low', 'medium', 'high'
-- `due_date` (DATE, NULLABLE)
-- `order` (INTEGER, NOT NULL)
-- `created_at` (TIMESTAMP, DEFAULT NOW())
-- `updated_at` (TIMESTAMP, DEFAULT NOW()) - RLS適用
+4.  **GPT-4oによるカード情報抽出・分類**:
+    *   Edge FunctionはWhisperから得られたテキストをOpenAI GPT-4o APIへ送信。
+    *   GPT-4oはテキストから以下の情報を抽出し、JSON形式で構造化:
+        *   `cardText`: カンバンカードのタイトル/主要テキスト
+        *   `project`: 関連するプロジェクト名 (任意)
+        *   `priority`: 優先度 (high, medium, low) (任意)
+        *   `dueDate`: 期限 (任意、ISO 8601形式)
+    *   **AI Confidence First**: GPT-4oは抽出した情報の「自信度」も返却。自信度が低い場合、`suggestion`は`null`または`confidence`が低い値となる。
 
-#### 1.2.5 `audit_logs` テーブル (AI処理記録用)
-- `id` (UUID, PK, DEFAULT gen_random_uuid())
-- `user_id` (UUID, FK -> users.id, NULLABLE)
-- `event_type` (TEXT, NOT NULL) - 例: 'audio_transcription', 'card_suggestion', 'card_creation'
-- `payload` (JSONB, NULLABLE) - 処理の詳細、AIの応答、入力データなど
-- `created_at` (TIMESTAMP, DEFAULT NOW())
+5.  **クライアントへの返却**:
+    *   Edge FunctionはGPT-4oからの構造化データ (`KanbanCardSuggestion`) と自信度をクライアントへ返却。
 
-### 1.3 AI処理フロー (音声入力からカード生成まで)
+6.  **クライアントでの確認・作成**:
+    *   クライアントは受信した `KanbanCardSuggestion` を `AiSuggestionModal` でユーザーに表示。
+    *   ユーザーは提案された内容を確認・編集。
+    *   ユーザーが「確定」した場合、`createKanbanCard` API (Supabase) を呼び出し、カードをDBに保存。
+    *   **Zero Friction**: AIの自信度が高い場合は、自動的にカードが作成され、ユーザー確認ステップをスキップすることも可能 (今後の実装)。
 
-1.  **クライアント (Mobile/Web)**
-    *   ユーザーがマイクボタンを長押しして音声入力開始。
-    *   `useVoiceRecording` フックが録音を管理し、音声データを一時ファイルとして保存。
-    *   ユーザーがボタンを離すと録音停止。
-    *   録音された音声ファイル (`.webm` または `.m4a`) を取得。
-    *   音声ファイルを `processAudioWithAI` (APIクライアント) 経由で Edge Function へ送信。
+### 1.3 リアルタイム同期とオフライン対応 (Local First Sync)
 
-2.  **Edge Function (`process-audio`)**
-    *   クライアントから受信した音声データ (Blob) を直接 Whisper API (OpenAI) へストリーミング転送。
-    *   **Privacy by Design**: 音声データはEdge Functionに永続保存せず、処理後即時破棄。
-    *   Whisper APIからテキスト (`transcription`) を受信。
-    *   `transcription` と、必要に応じてユーザーの既存のボード/カード情報 (Pinecone Vector DBから取得) をGPT-4oへ送信。
-    *   GPT-4oは以下の構造でカンバンカードの提案を生成:
-        ```typescript
-        export interface KanbanCardSuggestion {
-          cardText: string;
-          project: string | null;
-          priority: "low" | "medium" | "high" | null;
-          dueDate: string | null; // YYYY-MM-DD format
-          confidence: number; // AIの提案に対する自信度 (0.0 - 1.0)
-        }
-        ```
-    *   AIの `confidence` が閾値 (例: 0.8) 未満の場合、または特定のキーワード (例: "確認") が含まれる場合、提案をユーザーに提示して確認を求める。
-    *   `audit_logs` テーブルにAI処理の記録を保存。
-    *   生成された `KanbanCardSuggestion` をクライアントに返却。
+#### リアルタイム同期 (Supabase Realtime)
+- **目的**: 複数のデバイス間、またはチームメンバー間でのカンバンボード/カードのリアルタイム同期。
+- **実装**:
+    - `src/hooks/useRealtimeKanban.ts` フックを作成。
+    - `supabase.channel().on('postgres_changes', ...).subscribe()` を使用し、`kanban_boards` および `kanban_cards` テーブルの変更をリッスン。
+    - 認証されたユーザーの `user_id` に基づいて `kanban_boards` をフィルタリング。
+    - `boardId` が提供された場合、そのボードの `kanban_cards` を `board_id` に基づいてフィルタリング。
+    - 変更イベント (INSERT, UPDATE, DELETE) に応じて、Zustandストア (`useKanbanStore`) を更新。
+    - TanStack Query の `queryClient.invalidateQueries` を使用し、関連するクエリキャッシュを無効化し、最新データをフェッチさせる。
 
-3.  **クライアント (Mobile/Web)**
-    *   `processAudioWithAI` から `KanbanCardSuggestion` を受信。
-    *   **AI Confidence First**: `confidence` が低い、またはユーザー確認が必要な場合、`AiSuggestionModal` を表示してユーザーに提案内容の確認・編集を促す。
-    *   ユーザーが提案を承認または編集後、`createKanbanCard` (APIクライアント) を呼び出し、Supabase DBにカードを永続化。
-    *   `AiSuggestionModal` は、カードテキスト、プロジェクト、優先度、期日などのフィールドを編集可能にする。
+#### オフライン対応 (Local First Sync)
+- **目的**: ネットワーク接続がない状態でもユーザーがカードの作成・編集・削除を行えるようにし、接続回復後に自動的に同期。
+- **実装**:
+    - `src/stores/kanbanStore.ts` にオフライン変更を保存する `offlineChanges` ステートを追加。
+        - `offlineChanges`: `{ [boardId: string]: { type: 'insert' | 'update' | 'delete', data: KanbanCard }[] }`
+    - `src/lib/offlineManager.ts` ファイルを作成。
+        - `addOfflineKanbanChange(boardId, type, data)`: ローカルで変更が発生した際に `offlineChanges` に追加する関数。
+        - `syncOfflineChanges()`: ネットワーク接続が回復した際に `offlineChanges` を読み込み、Supabaseに書き込む関数。
+            - 各変更タイプ (insert, update, delete) に応じて適切なSupabase操作を実行。
+            - 成功した変更は `offlineChanges` から削除。
+            - 失敗した変更は残し、次回の同期で再試行。
+            - 同期後、TanStack Query の `queryClient.invalidateQueries` を使用し、関連するクエリキャッシュを無効化。
+    - `useKanbanStore` は `zustand/middleware` の `persist` を使用し、`offlineChanges` を `AsyncStorage` に永続化。
+    - アプリ起動時やネットワーク状態の変化時に `syncOfflineChanges` を呼び出すロジックを `_layout.tsx` またはメインコンポーネントに実装。
 
-### 1.4 UI/UXフロー (音声入力)
+### 1.4 認証フロー
 
-1.  **メイン画面/ボード詳細画面**
-    *   画面下部に常に表示されるマイクボタン (`VoiceInputButton`)。
-    *   ボタンは録音中は赤色、アイドル時は青色。
-    *   録音中はボタン中央に「録音中...」またはタイマーが表示される。
-    *   処理中は「処理中...」と表示され、ActivityIndicatorが回転。
+1.  **初期ロード**:
+    *   `src/hooks/useAuth.ts` が `supabase.auth.getSession()` を呼び出し、既存のセッションを確認。
+    *   セッションがあれば `useAuthStore` に保存し、ユーザーをメイン画面へリダイレクト。
+    *   セッションがなければサインイン/サインアップ画面へ。
 
-2.  **AI提案確認モーダル (`AiSuggestionModal`)**
-    *   AIがカード提案を生成後、自動的に表示される。
-    *   タイトル: 「AIの提案を確認」
-    *   表示内容:
-        *   カードテキスト (編集可能なTextInput)
-        *   プロジェクト名 (編集可能なTextInput, 任意)
-        *   優先度 (編集可能なTextInput, 任意)
-        *   期日 (編集可能なTextInput, 任意, YYYY-MM-DD形式)
-    *   アクションボタン:
-        *   「キャンセル」: モーダルを閉じ、カード作成を破棄。
-        *   「確認して作成」: 編集内容でカードをDBに作成。
-    *   ローディング状態: 提案取得中はActivityIndicatorと「処理中...」メッセージ。
-    *   エラー状態: エラーメッセージと「閉じる」ボタン。
+2.  **サインイン/サインアップ**:
+    *   `supabase.auth.signInWithPassword()` または `signUp()` を使用。
+    *   OAuth (Google, Apple) も `supabase.auth.signInWithOAuth()` でサポート。
+    *   マジックリンクも `supabase.auth.signInWithOtp()` でサポート。
 
-### 1.5 認証フロー
+3.  **セッション管理**:
+    *   `supabase.auth.onAuthStateChange` を `useAuth.ts` で購読し、認証状態の変化をリアルタイムで `useAuthStore` に反映。
+    *   `AsyncStorage` を使用してセッションを永続化 (`src/lib/supabase.ts` で設定)。
 
--   **サインイン/サインアップ画面 (`app/(auth)/sign-in.tsx`, `app/(auth)/sign-up.tsx`)**
-    *   メール/パスワード認証
-    *   マジックリンク認証
-    *   Google/Apple OAuth2認証 (Expo Auth Sessionを使用)
--   **セッション管理**
-    *   `useAuthStore` (Zustand) でセッション状態を管理。
-    *   `useAuth` フックでSupabaseの`onAuthStateChange`を購読し、Zustandストアを更新。
-    *   `AsyncStorage` を使用してセッションを永続化。
+### 1.5 UI/UX (Liquid Minimal)
 
-### 1.6 Kanbanボード表示
-
--   **ボード一覧画面 (`app/(main)/boards.tsx`)**
-    *   `useKanbanBoards` フックでユーザーのボード一覧を取得。
-    *   `KanbanBoardListItem` コンポーネントで各ボードを表示。
-    *   ボード名、説明、カード数、作成日を表示。
-    *   各アイテムは `expo-router` の `Link` でボード詳細画面へ遷移。
+-   **全体**: コンテンツが主役。余計な装飾やアニメーションは最小限に。
+-   **音声入力ボタン**:
+    *   常に画面下部中央に配置。
+    *   録音中は色が変わる (例: 青 -> 赤)。
+    *   処理中はローディングインジケーターを表示。
+-   **AI提案モーダル (`AiSuggestionModal`)**:
+    *   音声入力後、AIがカード情報を抽出した際に表示。
+    *   抽出された `cardText`, `project`, `priority`, `dueDate` を編集可能なフォームで表示。
+    *   ユーザーは内容を確認・修正し、「確定」または「キャンセル」を選択。
+    *   AIの自信度が低い場合や `suggestion` が `null` の場合は、エラーメッセージを表示し、ユーザーに再試行を促す。
+-   **カンバンボード一覧**:
+    *   各ボードはカード形式で表示。
+    *   ボード名、説明、作成日、カード数を表示。
+    *   タップでボード詳細画面へ遷移。
 
 ## Development Instructions
 N/A
@@ -399,3 +363,9 @@ N/A
 - Default language: ja (Japanese)
 - RTL support required for Arabic (ar)
 - Use isRTL flag from i18n module for layout adjustments
+
+---
+
+## 変更履歴
+- 2024-07-29: リアルタイム同期とオフライン対応の設計を追加。AI提案モーダルの詳細を追加。
+- 2024-07-28: 初版作成。基本アーキテクチャ、データフロー、認証フロー、UI/UX原則を定義。

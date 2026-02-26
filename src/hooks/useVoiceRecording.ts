@@ -27,7 +27,7 @@ export function useVoiceRecording(): UseVoiceRecordingResult {
   const intervalRef = useRef<NodeJS.Timeout | null>(null);
 
   const clearRecording = useCallback(() => {
-    setAudioDuration(0); // Reset duration
+    setRecordingDuration(0); // Reset duration
     if (audioUri) {
       void FileSystem.deleteAsync(audioUri, { idempotent: true }).catch(err =>
         console.warn("Failed to delete audio file:", err)
@@ -35,10 +35,6 @@ export function useVoiceRecording(): UseVoiceRecordingResult {
     }
     setAudioUri(null);
   }, [audioUri]);
-
-  const setAudioDuration = (duration: number) => {
-    setRecordingDuration(duration);
-  };
 
   const startRecording = useCallback(async (): Promise<void> => {
     try {
@@ -69,11 +65,11 @@ export function useVoiceRecording(): UseVoiceRecordingResult {
       );
       recordingRef.current = recording;
       setIsRecording(true);
-      setAudioDuration(0);
+      setRecordingDuration(0);
       setAudioUri(null); // Clear previous URI
 
       intervalRef.current = setInterval(() => {
-        setAudioDuration((prev) => prev + 1);
+        setRecordingDuration((prev) => prev + 1);
       }, 1000);
     } catch (err: unknown) {
       console.error("Failed to start recording", err);
@@ -131,13 +127,18 @@ export function useVoiceRecording(): UseVoiceRecordingResult {
         clearInterval(intervalRef.current);
       }
       // Ensure any lingering audio file is deleted on unmount
+      // The `audioUri` state is only set after `stopRecording` is called.
+      // If the component unmounts *during* recording, `audioUri` might still be null.
+      // The `recordingRef.current` cleanup handles the active recording.
+      // If `audioUri` is set, it means a recording was completed and its URI stored.
+      // This cleanup should delete that file.
       if (audioUri) {
         void FileSystem.deleteAsync(audioUri, { idempotent: true }).catch(err =>
           console.warn("Failed to delete audio file during unmount:", err)
         );
       }
     };
-  }, [audioUri]); // Added audioUri to dependency array for cleanup
+  }, [audioUri]);
 
   return {
     isRecording,

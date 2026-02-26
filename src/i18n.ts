@@ -1,7 +1,7 @@
 import * as Localization from "expo-localization";
 import { I18nManager } from "react-native";
 import { I18n } from "i18n-js";
-import { translations } from "./translations";
+import { translations } from "./i18n/translations";
 
 // Set the locale once at the beginning of your app.
 export const lang = Localization.getLocales()[0]?.languageCode || "ja"; // Default to Japanese
@@ -36,4 +36,3 @@ export const t = (key: string, options?: Record<string, unknown>): string => {
 };
 
 export { isRTL };
-

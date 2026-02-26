@@ -1,38 +1,54 @@
-import { useState, useEffect, useCallback } from "react";
-import { supabase } from "@/lib/supabase";
+import { useCallback } from "react";
 import { useAuthStore } from "@/stores/authStore";
-import { KanbanBoard } from "@/types/kanban"; // Use the type from src/types
-import { PostgrestError } from "@supabase/supabase-js"; // Import PostgrestError
-import { useQuery } from "@tanstack/react-query";
+import { KanbanBoard } from "@/types/kanban"; // Corrected import path
+import { PostgrestError } from "@supabase/supabase-js";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { fetchKanbanBoards } from "@/api/kanban";
 
 interface UseKanbanBoardsResult {
-  boards: KanbanBoard[]; // Should always be an array, even if empty
+  boards: KanbanBoard[];
   loading: boolean;
-  error: PostgrestError | null; // Changed error type to PostgrestError
+  error: PostgrestError | null;
   refetch: () => Promise<void>;
 }
 
 export function useKanbanBoards(): UseKanbanBoardsResult {
   const session = useAuthStore((state) => state.session);
+  const queryClient = useQueryClient();
 
-  const { data, isLoading, error, refetch } = useQuery<KanbanBoard[], PostgrestError>({
+  const queryFn = useCallback(async () => {
+    if (!session?.user?.id) {
+      return [];
+    }
+    const { data, error } = await fetchKanbanBoards(session);
+    if (error) {
+      throw error;
+    }
+    return data || [];
+  }, [session]);
+
+  const {
+    data: boards = [],
+    isLoading,
+    error,
+    refetch,
+  } = useQuery<KanbanBoard[], PostgrestError>({
     queryKey: ["kanbanBoards", session?.user?.id],
-    queryFn: async () => {
-      const { data, error: fetchError } = await fetchKanbanBoards(session);
-      if (fetchError) {
-        throw fetchError;
-      }
-      return data || [];
-    },
-    enabled: !!session?.user?.id, // Only run query if session and user ID exist
-    initialData: [], // Ensure data is always an array
+    queryFn: queryFn,
+    enabled: !!session?.user?.id,
+    staleTime: 1000 * 60 * 5,
+    refetchOnWindowFocus: true,
   });
 
+  const manualRefetch = useCallback(async () => {
+    await queryClient.invalidateQueries({ queryKey: ["kanbanBoards", session?.user?.id] });
+    await refetch();
+  }, [queryClient, session?.user?.id, refetch]);
+
   return {
-    boards: data || [],
+    boards,
     loading: isLoading,
-    error: error || null,
-    refetch: async () => { await refetch(); },
+    error,
+    refetch: manualRefetch,
   };
 }

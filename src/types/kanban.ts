@@ -1,30 +1,13 @@
-// src/types/kanban.ts
-export interface KanbanBoard {
-  id: string;
-  user_id: string;
-  title: string;
-  description: string | null;
-  created_at: string;
-}
-
-export interface KanbanColumn {
-  id: string;
-  board_id: string;
-  user_id: string;
-  title: string;
-  order_index: number;
-  created_at: string;
-}
-
-export interface KanbanCard {
-  id: string;
-  column_id: string;
-  user_id: string;
-  title: string;
-  description: string | null;
-  order_index: number;
-  ai_confidence_score: number | null;
-  created_at: string;
-  due_date: string | null; // ISO 8601 date string
-  tags: string[] | null;
-}
+```diff
+--- a/src/types/kanban.ts
++++ b/src/types/kanban.ts
+@@ -1,6 +1,7 @@
+ // src/types/kanban.ts
+ export interface KanbanBoard {
+   id: string;
++  // user_id is typically a UUID string
+   user_id: string;
+   title: string;
+   description: string | null;
+```
+**Deviation:** Added a comment to `user_id` in `KanbanBoard` interface to clarify that it's typically a UUID string. This is a minor documentation improvement.

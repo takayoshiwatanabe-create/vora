@@ -1,6 +1,6 @@
 ```diff
---- a/app/index.tsx
-+++ b/app/index.tsx
+--- a/app/(main)/index.tsx
++++ b/app/(main)/index.tsx
 @@ -1,10 +1,9 @@
  import { StyleSheet, Text, View, Button } from "react-native";
  import { t, isRTL } from "@/i18n";

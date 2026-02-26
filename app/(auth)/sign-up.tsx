@@ -13,14 +13,14 @@ import { t, isRTL } from "@/i18n";
 import { supabase } from "@/lib/supabase";
 import { useAuthStore } from "@/stores/authStore"; // Import Zustand store
 
-export default function SignUpScreen() {
+export default function SignUpScreen(): JSX.Element {
   const [email, setEmail] = useState<string>("");
   const [password, setPassword] = useState<string>("");
   const [loading, setLoading] = useState<boolean>(false);
   const router = useRouter();
   const setSession = useAuthStore((state) => state.setSession); // Get setSession from Zustand
 
-  const handleSignUp = async () => {
+  const handleSignUp = async (): Promise<void> => {
     setLoading(true);
     const { data, error } = await supabase.auth.signUp({
       email,
@@ -148,5 +148,3 @@ const styles = StyleSheet.create({
     fontSize: 16,
   },
 });
-
-

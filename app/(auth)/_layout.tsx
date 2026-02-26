@@ -1,7 +1,7 @@
 import { Stack } from "expo-router";
 import { t } from "@/i18n";
 
-export default function AuthLayout() {
+export default function AuthLayout(): JSX.Element {
   return (
     <Stack>
       <Stack.Screen
@@ -15,5 +15,3 @@ export default function AuthLayout() {
     </Stack>
   );
 }
-
-

@@ -3,14 +3,14 @@ import { View, Text, StyleSheet } from "react-native";
 import { Stack, useLocalSearchParams } from "expo-router";
 import { t, isRTL } from "@/i18n";
 
-export default function KanbanBoardDetailScreen() {
-  const { boardId } = useLocalSearchParams();
+export default function KanbanBoardDetailScreen(): JSX.Element {
+  const { boardId } = useLocalSearchParams<{ boardId: string }>();
 
   return (
     <View style={[styles.container, isRTL && styles.rtlContainer]}>
       <Stack.Screen options={{ title: t("kanban.boardDetailTitle") }} />
       <Text style={[styles.title, isRTL && styles.rtlText]}>
-        {t("kanban.boardIdDisplay", { id: boardId as string })}
+        {t("kanban.boardIdDisplay", { id: boardId })}
       </Text>
       <Text style={[styles.subtitle, isRTL && styles.rtlText]}>
         {t("kanban.boardDetailPlaceholder")}

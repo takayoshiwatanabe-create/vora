@@ -1,0 +1,44 @@
+{
+  "expo": {
+    "name": "Vora (ヴォラ)",
+    "slug": "vora",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "icon": "./assets/icon.png",
+    "scheme": "vora",
+    "userInterfaceStyle": "automatic",
+    "newArchEnabled": true,
+    "ios": {
+      "supportsTablet": true,
+      "bundleIdentifier": "com.zerocode.vora"
+    },
+    "android": {
+      "adaptiveIcon": {
+        "foregroundImage": "./assets/adaptive-icon.png",
+        "backgroundColor": "#ffffff"
+      },
+      "package": "com.zerocode.vora"
+    },
+    "web": {
+      "bundler": "metro",
+      "output": "static",
+      "favicon": "./assets/favicon.png"
+    },
+    "plugins": [
+      "expo-router",
+      "expo-localization"
+    ],
+    "locales": {
+      "ja": "./locales/ja.json",
+      "en": "./locales/en.json",
+      "zh": "./locales/zh.json",
+      "ko": "./locales/ko.json",
+      "es": "./locales/es.json",
+      "fr": "./locales/fr.json",
+      "de": "./locales/de.json",
+      "pt": "./locales/pt.json",
+      "ar": "./locales/ar.json",
+      "hi": "./locales/hi.json"
+    }
+  }
+}
